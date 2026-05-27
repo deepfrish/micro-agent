@@ -259,14 +259,53 @@ The conversation layer can bias a turn toward web tools with `/net on` or `/net 
 
 ## Skill Layer
 
-Code: `core/skills.py`, `core/product/skills/`, `skills/`
+Code: `core/skills.py`, `core/conversation.py`, `core/context_builder.py`, `core/memory_pipeline.py`, `core/task_pipeline.py`
 
-- `SkillRegistry` scans `skills/<skill-id>/SKILL.md` and optional `agents/openai.yaml` and `references/`
+Skill is a task capability layer, not a low-level tool. It injects a playbook, boundaries, output requirements, and references into the conversation flow.
+
+### Directory Layout
+
+```text
+skills/
+├── engineering-exploration/
+│   ├── SKILL.md
+│   ├── agents/
+│   │   └── openai.yaml
+│   └── references/
+│       ├── capability-design.md
+│       ├── engineering-design-dimensions.md
+│       ├── exploration-boundaries.md
+│       └── platform-portability.md
+└── engineering-exploration-skill/
+    ├── README.md
+    └── engineering-exploration.zip
+```
+
+- `skills/engineering-exploration/` is the skill runtime actually loads
+- `skills/engineering-exploration-skill/` keeps the downloaded source bundle for traceability
+- `SKILL.md` defines triggers, allowed/disallowed actions, output contract, and reference navigation
+- `agents/openai.yaml` holds display metadata and the default prompt
+- `references/` stores optional design references that are loaded on demand
+
+### Activation
+
 - Explicit calls like "use xxx skill" or "使用 xxxskill" activate the matching skill directly
 - Implicit calls use `SkillRouter` to decide whether a skill should be activated, with heuristic fallback
-- The selected skill is injected as its own system context block, which influences `ContextBuilder`, `TurnRouter`, `TaskPlanner`, and direct replies
-- The bundled example skill lives at `skills/engineering-exploration/`
-- The downloaded source repo stays at `skills/engineering-exploration-skill/`; runtime uses `skills/engineering-exploration/`
+- The selected skill is injected as its own system context block
+- That context influences `TurnRouter`, `TaskPlanner`, and direct replies
+
+### Runtime Flow
+
+1. `ConversationManager.ask()` resolves skills first
+2. The chosen skill is written into session `skill_state`
+3. `ContextBuilder` turns skill content into a dedicated system block
+4. `TurnRouter` and `TaskPlanner` read the skill context
+5. The final answer stays aligned with the skill's boundaries, style, and output contract
+
+### Current Example
+
+- `skills/engineering-exploration/` is an exploration and planning skill
+- `scripts/skill_smoke_test.py` verifies explicit and implicit skill activation offline
 
 ## Repository Layout
 

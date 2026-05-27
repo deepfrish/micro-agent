@@ -87,12 +87,37 @@ FreeWeb MCP 工具：
 
 ## Skill 层
 
-- `skills/<skill-id>/`：本地 skill 安装目录，包含 `SKILL.md`、可选 `agents/openai.yaml` 和 `references/`
-- `skills/engineering-exploration/`：当前已安装的探索型 skill
-- `skills/engineering-exploration-skill/`：下载得到的原始仓库，运行时以 `skills/engineering-exploration/` 为准
+skill 是一层“任务能力包”，不是底层工具。它会把一类任务的做法、边界和输出方式注入到现有对话流程里。
+
+### 当前 skill 目录
+
+```text
+skills/
+├── engineering-exploration/
+│   ├── SKILL.md
+│   ├── agents/
+│   │   └── openai.yaml
+│   └── references/
+│       ├── capability-design.md
+│       ├── engineering-design-dimensions.md
+│       ├── exploration-boundaries.md
+│       └── platform-portability.md
+└── engineering-exploration-skill/
+    ├── README.md
+    └── engineering-exploration.zip
+```
+
+- `skills/engineering-exploration/`：当前真正被运行时加载的 skill
+- `skills/engineering-exploration-skill/`：下载下来的原始仓库和压缩包，方便追踪来源
+- `SKILL.md`：skill 主说明，定义触发场景、允许/禁止动作和输出契约
+- `agents/openai.yaml`：Codex 侧展示信息和默认提示
+- `references/`：按需读取的设计参考
+
+### 触发方式
+
 - 显性调用：用户说“使用 xxxskill”“用 xxx skill”时直接命中
 - 隐性调用：模型根据任务语义自动选择 skill
-- skill 内容会作为独立 system 上下文注入对话流程
+- 命中的 skill 会作为独立 system 上下文注入对话流程，并影响路由、任务拆分和回答风格
 
 ## 核心目录
 
@@ -105,6 +130,9 @@ FreeWeb MCP 工具：
 - `knowledge_base/`：本地 RAG 语料
 - `examples/`：演示、调试脚本、轨迹日志
 - `data/`：运行时生成的会话、窗口记忆和全局记忆
+- `core/skills.py`：skill 加载、匹配、显性/隐性路由
+- `core/conversation.py`：把 skill 注入到会话、路由和任务执行
+- `core/context_builder.py`：把 skill 作为独立上下文块拼装进 prompt
 
 如果 clone 后缺少 `freeweb/` 子模块，运行：
 

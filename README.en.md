@@ -83,12 +83,37 @@ FreeWeb MCP tools include:
 
 ## Skill Layer
 
-- `skills/<skill-id>/` - local skill install directory with `SKILL.md`, optional `agents/openai.yaml`, and `references/`
-- `skills/engineering-exploration/` - the bundled exploration skill
-- `skills/engineering-exploration-skill/` - the downloaded source repo; runtime uses `skills/engineering-exploration/`
+Skill is a task capability layer, not a low-level tool. It injects a task playbook, boundaries, and output shape into the existing conversation flow.
+
+### Current Skill Layout
+
+```text
+skills/
+├── engineering-exploration/
+│   ├── SKILL.md
+│   ├── agents/
+│   │   └── openai.yaml
+│   └── references/
+│       ├── capability-design.md
+│       ├── engineering-design-dimensions.md
+│       ├── exploration-boundaries.md
+│       └── platform-portability.md
+└── engineering-exploration-skill/
+    ├── README.md
+    └── engineering-exploration.zip
+```
+
+- `skills/engineering-exploration/` - the skill that runtime actually loads
+- `skills/engineering-exploration-skill/` - the downloaded source repo and zip bundle for traceability
+- `SKILL.md` - the skill entry document: triggers, allowed/disallowed actions, and output contract
+- `agents/openai.yaml` - Codex-facing metadata and default prompt
+- `references/` - supplemental design references loaded on demand
+
+### Activation
+
 - Explicit calls like "use xxx skill" or "使用 xxxskill" activate a matching skill directly
 - Implicit calls let the model choose a skill when the task benefits from it
-- Selected skill content is injected as its own system context block in the conversation flow
+- The selected skill is injected as its own system context block and influences routing, task splitting, and answer style
 
 ## Core Layout
 
@@ -101,6 +126,9 @@ FreeWeb MCP tools include:
 - `knowledge_base/` - local RAG corpus
 - `examples/` - demos, traces, and compression logs
 - `data/` - runtime session, window memory, and global memory state
+- `core/skills.py` - skill loading, matching, and explicit/implicit routing
+- `core/conversation.py` - injects skill state into sessions, routing, and task execution
+- `core/context_builder.py` - adds skill content as a dedicated prompt block
 
 If the submodule is missing after clone, run:
 

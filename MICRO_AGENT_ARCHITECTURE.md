@@ -259,14 +259,53 @@ Provider：`core/providers/freeweb.py`
 
 ## Skill 层
 
-代码位置：`core/skills.py`、`core/product/skills/`、`skills/`
+代码位置：`core/skills.py`、`core/conversation.py`、`core/context_builder.py`、`core/memory_pipeline.py`、`core/task_pipeline.py`
 
-- `SkillRegistry` 扫描 `skills/<skill-id>/SKILL.md`，并读取可选的 `agents/openai.yaml` 和 `references/`
+skill 是任务能力层，不是底层 tool。它把一类任务的做法、边界、输出要求和参考资料，作为独立上下文注入现有对话链路。
+
+### 目录结构
+
+```text
+skills/
+├── engineering-exploration/
+│   ├── SKILL.md
+│   ├── agents/
+│   │   └── openai.yaml
+│   └── references/
+│       ├── capability-design.md
+│       ├── engineering-design-dimensions.md
+│       ├── exploration-boundaries.md
+│       └── platform-portability.md
+└── engineering-exploration-skill/
+    ├── README.md
+    └── engineering-exploration.zip
+```
+
+- `skills/engineering-exploration/`：runtime 真正加载的 skill
+- `skills/engineering-exploration-skill/`：下载得到的来源包，保留为普通目录
+- `SKILL.md`：定义触发场景、允许/禁止动作、输出契约和参考导航
+- `agents/openai.yaml`：显示名、短描述和默认 prompt
+- `references/`：按需读取的设计参考
+
+### 调用方式
+
 - 显性调用：用户说“使用 xxxskill”“用 xxx skill”时直接命中
 - 隐性调用：`SkillRouter` 通过 LLM 判断是否激活 skill，必要时用启发式兜底
-- 命中的 skill 会作为独立 system 上下文注入 `ContextBuilder`，并影响 `TurnRouter`、`TaskPlanner` 和直接回答
-- 当前已安装的示例 skill 是 `skills/engineering-exploration/`
-- 下载得到的原始仓库保留在 `skills/engineering-exploration-skill/`，runtime 以 `skills/engineering-exploration/` 为准
+- 命中的 skill 会作为独立 system 上下文注入 `ContextBuilder`
+- skill 上下文会影响 `TurnRouter`、`TaskPlanner` 和直接回答的语气与约束
+
+### 运行流
+
+1. `ConversationManager.ask()` 先做 skill 识别
+2. 命中的 skill 写入 session 的 `skill_state`
+3. `ContextBuilder` 把 skill 内容拼成独立 system block
+4. `TurnRouter` 和 `TaskPlanner` 读取 skill 上下文
+5. 最终回答保持和 skill 的边界、风格、输出要求一致
+
+### 当前示例
+
+- `skills/engineering-exploration/`：探索/规划型 skill，适合先讨论方案、边界和实现路径
+- `scripts/skill_smoke_test.py`：离线验证显性和隐性 skill 触发是否生效
 
 ## 代码与文件结构
 
