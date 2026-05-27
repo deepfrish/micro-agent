@@ -5,25 +5,27 @@
 ## 总览
 
 ```mermaid
-graph TD
-    U["User"] --> CLI["CLI"]
-    CLI --> CM["ConversationManager"]
-    CM --> TR{"Turn Router"}
-    TR --> MR["Memory reply"]
-    TR --> DR["Direct reply"]
-    TR --> RG["ReAct graph"]
-    MR --> ANS["Answer"]
-    DR --> ANS
-    RG --> TOOLS["Tools / MCP / local tools"]
-    TOOLS --> ANS
-    ANS --> SAVE["Save session"]
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
+flowchart TB
+    U[User] --> CLI[CLI]
+    CLI --> CM[Conversation manager]
+    CM --> ROUTER[Turn router]
+    ROUTER --> MEM[Memory reply]
+    ROUTER --> DIR[Direct reply]
+    ROUTER --> ACT[ReAct graph]
+    MEM --> OUT[Answer]
+    DIR --> OUT
+    ACT --> TOOLS[Tools]
+    TOOLS --> OUT
+    OUT --> SAVE[Save session]
 ```
 
 ```mermaid
-graph TD
-    SAVE["Save session"] --> EXIT["/exit consolidator"]
-    EXIT --> WM["Window memory"]
-    EXIT --> GM["Global memory"]
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
+flowchart TB
+    SAVE[Save session] --> EXIT["/exit consolidator"]
+    EXIT --> WM[Window memory]
+    EXIT --> GM[Global memory]
 ```
 
 ## 主要入口
@@ -147,6 +149,7 @@ ReAct 图包含这些节点：
 - `pinned()` 优先返回高价值稳定事实
 
 ```mermaid
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
 flowchart LR
     U[User turn] --> WM[Working memory]
     U --> H[chat_sessions.json]
