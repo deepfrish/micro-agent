@@ -15,6 +15,7 @@ from .long_term_memory import LongTermMemoryStore
 from .compression import WindowCompressor
 from .memory_pipeline import ExitMemoryConsolidator, GlobalMemoryRouter, RAGRouter, TurnRouter
 from .prompts import DIRECT_REPLY_PROMPT, NAMESPACE_PROMPT
+from .skills import SkillRegistry, SkillResolution, SkillRouter
 from .task_pipeline import TaskPlanner, TaskSynthesizer
 
 ROUTE_LOG = Path(__file__).resolve().parents[1] / "examples" / "route_log.jsonl"
@@ -72,6 +73,7 @@ class ConversationSession:
     namespace: str
     history: List[Dict[str, str]] = field(default_factory=list)
     compression_state: Dict[str, Any] = field(default_factory=dict)
+    skill_state: Dict[str, Any] = field(default_factory=dict)
     network_mode: str = "off"
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
@@ -91,6 +93,7 @@ class ConversationSession:
             "namespace": self.namespace,
             "history": self.history,
             "compression_state": self.compression_state,
+            "skill_state": self.skill_state,
             "network_mode": self.network_mode,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -140,6 +143,7 @@ class ConversationStore:
                 namespace=session_namespace,
                 history=normalized_history,
                 compression_state=dict(entry.get("compression_state") or {}) if isinstance(entry.get("compression_state"), Mapping) else {},
+                skill_state=dict(entry.get("skill_state") or {}) if isinstance(entry.get("skill_state"), Mapping) else {},
                 network_mode=self._normalize_network_mode(str(entry.get("network_mode") or "off")),
                 created_at=str(entry.get("created_at") or _now_iso()),
                 updated_at=str(entry.get("updated_at") or _now_iso()),
@@ -171,6 +175,8 @@ class ConversationManager:
         memory_router: GlobalMemoryRouter | None = None,
         memory_consolidator: ExitMemoryConsolidator | None = None,
         turn_router: TurnRouter | None = None,
+        skill_registry: SkillRegistry | None = None,
+        skill_router: SkillRouter | None = None,
         task_planner: TaskPlanner | None = None,
         task_synthesizer: TaskSynthesizer | None = None,
         window_compressor: WindowCompressor | None = None,
@@ -183,6 +189,8 @@ class ConversationManager:
         self.rag_router = rag_router or RAGRouter(self.client)
         self.memory_router = memory_router or GlobalMemoryRouter(self.client)
         self.turn_router = turn_router or TurnRouter(self.client)
+        self.skill_registry = skill_registry or SkillRegistry.default()
+        self.skill_router = skill_router or SkillRouter(self.skill_registry, self.client)
         self.task_planner = task_planner or TaskPlanner(self.client)
         self.task_synthesizer = task_synthesizer or TaskSynthesizer(self.client)
         self.window_compressor = window_compressor or WindowCompressor(self.client)
@@ -350,6 +358,9 @@ class ConversationManager:
         agent = session.ensure_agent(self.config, self.client)
         agent.reset_turn_metadata()
         agent.working_memory.add(question)
+        skill_resolution = self.skill_router.resolve(question, session.history)
+        session.skill_state = skill_resolution.to_dict()
+        skill_context = skill_resolution.render_context()
         network_mode = self._normalize_network_mode(session.network_mode)
         network_active = network_mode in {"on", "once"}
         core_memories = self.memory_store.pinned(limit=8)
@@ -364,6 +375,7 @@ class ConversationManager:
             question,
             session.history,
             memory_context=self._format_memory_context(long_term_memories),
+            skill_context=skill_context,
             force_network=network_active,
         )
         self._write_route_log(
@@ -372,6 +384,7 @@ class ConversationManager:
                 "namespace": session.namespace,
                 "question": question,
                 "network_mode": network_mode,
+                "skill": skill_resolution.to_dict(),
                 "needs_split": bool(task_plan.get("needs_split")),
                 "tasks": task_plan.get("tasks") or [],
                 "long_term_memory_count": len(long_term_memories),
@@ -379,7 +392,7 @@ class ConversationManager:
         )
         if task_plan.get("needs_split") and len(task_plan.get("tasks") or []) > 1:
             task_results = [
-                self._execute_planned_task(session, agent, question, task)
+                self._execute_planned_task(session, agent, question, task, skill_resolution)
                 for task in task_plan.get("tasks") or []
             ]
             answer = self.task_synthesizer.synthesize(question, session.history, task_results).strip()
@@ -389,7 +402,7 @@ class ConversationManager:
             route = (
                 {"route": "react", "reason": "network mode forced react"}
                 if network_active
-                else self.turn_router.route(question, session.history)
+                else self.turn_router.route(question, session.history, skill_context=skill_context)
             )
             self._write_route_log(
                 {
@@ -397,6 +410,7 @@ class ConversationManager:
                     "namespace": session.namespace,
                     "question": question,
                     "network_mode": network_mode,
+                    "skill": skill_resolution.to_dict(),
                     "route": route,
                     "long_term_memory_count": len(long_term_memories),
                 }
@@ -409,6 +423,7 @@ class ConversationManager:
                 working_memory=agent.working_memory.format_context(question),
                 compression_state=session.compression_state,
                 long_term_memories=long_term_memories,
+                skill_context=skill_context,
                 rag_context=rag_context,
                 tool_list=agent.tool_registry.get_tools_description(),
                 include_tool_list=include_tool_list,
@@ -476,12 +491,14 @@ class ConversationManager:
         agent: ReActAgent,
         original_question: str,
         task: Mapping[str, Any],
+        skill_resolution: SkillResolution,
     ) -> Dict[str, str]:
         task_id = str(task.get("id") or "")
         route = str(task.get("route") or "direct").strip().lower()
         text = str(task.get("text") or "").strip()
         status = str(task.get("status") or "ready").strip().lower()
         blocking_question = str(task.get("blocking_question") or "").strip()
+        skill_context = skill_resolution.render_context()
 
         if status == "blocked":
             self._write_route_log(
@@ -501,7 +518,11 @@ class ConversationManager:
             }
 
         if route not in {"memory", "direct", "react"}:
-            route = self.turn_router.route(text or original_question, session.history).get("route", "direct")
+            route = self.turn_router.route(
+                text or original_question,
+                session.history,
+                skill_context=skill_context,
+            ).get("route", "direct")
         self._write_route_log(
             {
                 "stage": "subtask_route",
@@ -532,6 +553,7 @@ class ConversationManager:
             working_memory=agent.working_memory.format_context(text or original_question),
             compression_state=session.compression_state,
             long_term_memories=long_term_memories,
+            skill_context=skill_context,
             rag_context=rag_context,
             tool_list=agent.tool_registry.get_tools_description(),
             include_tool_list=include_tool_list,

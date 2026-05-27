@@ -3,6 +3,7 @@ from __future__ import annotations
 from .agents import ReActAgent
 from .conversation import ConversationManager, ConversationSession, ConversationStore, ContextBuildResult, ContextBuilder, ContextBuilderConfig, NamespacePlanner, TaskPlanner, TaskSynthesizer, WindowCompressor
 from .memory import ExitMemoryConsolidator, GlobalMemoryRouter, LongTermMemoryStore, RAGRouter, TurnRouter, WindowMemoryStore, WorkingMemory, extract_key_facts
+from .skills import SkillDefinition, SkillRegistry, SkillResolution, SkillRouter
 from .prompts import DIRECT_REPLY_PROMPT, GLOBAL_MEMORY_CONSOLIDATION_PROMPT, GLOBAL_MEMORY_ROUTE_PROMPT, NAMESPACE_PROMPT, RAG_ROUTE_PROMPT, REFLECT_PROMPT, SYSTEM_PROMPT, TASK_SPLIT_PROMPT, TASK_SYNTHESIS_PROMPT, TURN_ROUTE_PROMPT, WINDOW_FACT_RECALL_PROMPT, WINDOW_MEMORY_SUMMARY_PROMPT, WINDOW_MISSING_POINT_VERIFICATION_PROMPT
 from .rag import HashEmbeddingModel, KnowledgeBase, KnowledgeChunk, QdrantKnowledgeBase, QdrantVectorStore, SearchHit, chunk_text, read_document
 from .tools import (
@@ -50,6 +51,10 @@ __all__ = [
     "REFLECT_PROMPT",
     "ReActAgent",
     "SearchHit",
+    "SkillDefinition",
+    "SkillRegistry",
+    "SkillResolution",
+    "SkillRouter",
     "StaticMapTool",
     "SYSTEM_PROMPT",
     "TaskPlanner",

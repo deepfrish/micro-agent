@@ -5,22 +5,27 @@
 ## 总览
 
 ```mermaid
-flowchart TD
-    U[User] --> C[CLI / coder]
-    C --> M[ConversationManager]
-    M --> R{Turn Router}
-    R -->|memory| D[Direct reply]
-    R -->|direct| D
-    R -->|react| A[ReAct graph]
-    M --> G[Global memory router]
-    M --> K[RAG router]
-    A --> T[Tools / MCP / local tools]
-    D --> O[Answer]
-    A --> O
-    O --> S[Save session]
-    S --> E[Exit consolidator on /exit]
-    E --> W[Window memory]
-    E --> L[Global memory]
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
+flowchart TB
+    U[User] --> CLI[CLI]
+    CLI --> CM[Conversation manager]
+    CM --> ROUTER[Turn router]
+    ROUTER --> MEM[Memory reply]
+    ROUTER --> DIR[Direct reply]
+    ROUTER --> ACT[ReAct graph]
+    MEM --> OUT[Answer]
+    DIR --> OUT
+    ACT --> TOOLS[Tools]
+    TOOLS --> OUT
+    OUT --> SAVE[Save session]
+```
+
+```mermaid
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
+flowchart TB
+    SAVE[Save session] --> EXIT["/exit consolidator"]
+    EXIT --> WM[Window memory]
+    EXIT --> GM[Global memory]
 ```
 
 ## 主要入口
@@ -144,13 +149,14 @@ ReAct 图包含这些节点：
 - `pinned()` 优先返回高价值稳定事实
 
 ```mermaid
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
 flowchart LR
-    U[User turn] --> W[WorkingMemory]
+    U[User turn] --> WM[Working memory]
     U --> H[chat_sessions.json]
     H --> X[Exit consolidation]
-    X --> WM[window_memory.json]
-    X --> GM[global_memory.json]
-    GM --> Q[rank / search / pinned]
+    X --> WMN[window_memory.json]
+    X --> GMN[global_memory.json]
+    GMN --> IDX[Rank, search, pinned]
 ```
 
 ## RAG 逻辑
@@ -255,6 +261,189 @@ Provider：`core/providers/freeweb.py`
 | `inspect_llms_txt` | 检查 `llms.txt` 指引 |
 
 对话层可以用 `/net on` 或 `/net once` 偏向网页工具。
+
+## 模块目录
+
+### `coder/`
+
+```text
+coder/
+├── __main__.py
+└── cli/
+    ├── __init__.py
+    ├── app.py
+    ├── commands.py
+    └── memory_worker.py
+```
+
+- CLI 入口、命令解析、后台记忆 worker
+- `coder/cli/app.py` 是交互式入口
+
+### `core/`
+
+```text
+core/
+├── __init__.py
+├── agent.py
+├── compression.py
+├── conversation.py
+├── context_builder.py
+├── framework.py
+├── llm_client.py
+├── long_term_memory.py
+├── memory.py
+├── memory_pipeline.py
+├── prompts.py
+├── rag.py
+├── skills.py
+├── task_pipeline.py
+├── tools.py
+├── window_memory.py
+├── providers/
+│   ├── __init__.py
+│   ├── amap.py
+│   ├── base.py
+│   └── freeweb.py
+├── protocols/
+│   ├── __init__.py
+│   └── mcp/
+│       ├── __init__.py
+│       ├── client.py
+│       └── server.py
+└── product/
+    ├── __init__.py
+    ├── agents/
+    │   ├── __init__.py
+    │   └── react_agent.py
+    ├── conversation/
+    │   ├── __init__.py
+    │   └── manager.py
+    ├── memory/
+    │   ├── __init__.py
+    │   ├── long_term.py
+    │   ├── pipeline.py
+    │   └── working.py
+    ├── prompts/
+    │   ├── __init__.py
+    │   └── templates.py
+    ├── rag/
+    │   ├── __init__.py
+    │   └── knowledge_base.py
+    ├── skills/
+    │   └── __init__.py
+    └── tools/
+        ├── __init__.py
+        └── catalog.py
+```
+
+- `core/` 是底层运行时和兼容实现
+- `core/product/` 是更偏产品层的封装，阅读优先级更高
+- `core/providers/` 把外部能力包装成 provider
+- `core/protocols/mcp/` 实现 JSON-line MCP client/server
+
+### `skills/`
+
+```text
+skills/
+├── engineering-exploration/
+│   ├── SKILL.md
+│   ├── agents/
+│   │   └── openai.yaml
+│   └── references/
+│       ├── capability-design.md
+│       ├── engineering-design-dimensions.md
+│       ├── exploration-boundaries.md
+│       └── platform-portability.md
+└── engineering-exploration-skill/
+    ├── README.md
+    └── engineering-exploration.zip
+```
+
+- `skills/engineering-exploration/` 是 runtime 实际加载的 skill
+- `skills/engineering-exploration-skill/` 保留下载来源包，便于追溯
+
+### `scripts/`
+
+```text
+scripts/
+└── skill_smoke_test.py
+```
+
+- 离线验证显性和隐性 skill 触发是否生效
+
+### `examples/`
+
+```text
+examples/
+├── debug_freeweb_mcp.py
+├── main.py
+├── memory_playground.py
+├── qdrant_rag_demo.py
+├── rag_demo.py
+├── trace_run.py
+├── trace_three_step_qa.py
+└── working_memory_demo.py
+```
+
+- 演示、调试脚本和轨迹日志样例
+
+### `knowledge_base/`
+
+```text
+knowledge_base/
+├── chapter8_learning_path.md
+├── project_notes.md
+├── rag_basics.md
+└── rag_table_notes.csv
+```
+
+- 本地 RAG 语料
+
+### `freeweb/`
+
+```text
+freeweb/
+├── src/
+├── tests/
+├── README.md
+├── AGENTS.md
+├── CHANGELOG.md
+└── package.json
+```
+
+- 可选网页工具子模块，供 FreeWeb provider 使用
+
+### `langchain_core/`
+
+```text
+langchain_core/
+├── __init__.py
+└── messages.py
+```
+
+- 轻量 LangChain message 兼容层
+
+### `langgraph/`
+
+```text
+langgraph/
+├── __init__.py
+├── graph.py
+└── checkpoint/
+    ├── __init__.py
+    └── memory.py
+```
+
+- 本地 LangGraph 风格兼容实现
+
+### `data/`
+
+```text
+data/
+└── (runtime generated)
+```
+
+- 运行时生成的会话、窗口记忆和全局记忆
 
 ## 终端命令
 

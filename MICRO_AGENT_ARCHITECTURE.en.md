@@ -5,22 +5,27 @@ This guide explains the project structure, turn flow, memory model, RAG logic, a
 ## High-Level View
 
 ```mermaid
-flowchart TD
-    U[User] --> C[CLI / coder]
-    C --> M[ConversationManager]
-    M --> R{Turn Router}
-    R -->|memory| D[Direct reply]
-    R -->|direct| D
-    R -->|react| A[ReAct graph]
-    M --> G[Global memory router]
-    M --> K[RAG router]
-    A --> T[Tools / MCP / local tools]
-    D --> O[Answer]
-    A --> O
-    O --> S[Save session]
-    S --> E[Exit consolidator on /exit]
-    E --> W[Window memory]
-    E --> L[Global memory]
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
+flowchart TB
+    U[User] --> CLI[CLI]
+    CLI --> CM[Conversation manager]
+    CM --> ROUTER[Turn router]
+    ROUTER --> MEM[Memory reply]
+    ROUTER --> DIR[Direct reply]
+    ROUTER --> ACT[ReAct graph]
+    MEM --> OUT[Answer]
+    DIR --> OUT
+    ACT --> TOOLS[Tools]
+    TOOLS --> OUT
+    OUT --> SAVE[Save session]
+```
+
+```mermaid
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
+flowchart TB
+    SAVE[Save session] --> EXIT["/exit consolidator"]
+    EXIT --> WM[Window memory]
+    EXIT --> GM[Global memory]
 ```
 
 ## Main Entry Points
@@ -144,13 +149,14 @@ Code: `data/global_memory.json`
 - `pinned()` returns high-value stable facts first
 
 ```mermaid
+%%{init: {'flowchart': {'defaultRenderer': 'dagre', 'curve': 'linear'}}}%%
 flowchart LR
-    U[User turn] --> W[WorkingMemory]
+    U[User turn] --> WM[Working memory]
     U --> H[chat_sessions.json]
     H --> X[Exit consolidation]
-    X --> WM[window_memory.json]
-    X --> GM[global_memory.json]
-    GM --> Q[rank / search / pinned]
+    X --> WMN[window_memory.json]
+    X --> GMN[global_memory.json]
+    GMN --> IDX[Rank, search, pinned]
 ```
 
 ## RAG Logic
@@ -255,6 +261,189 @@ Common tools:
 | `inspect_llms_txt` | Inspect `llms.txt` guidance |
 
 The conversation layer can bias a turn toward web tools with `/net on` or `/net once`.
+
+## Module Layout
+
+### `coder/`
+
+```text
+coder/
+├── __main__.py
+└── cli/
+    ├── __init__.py
+    ├── app.py
+    ├── commands.py
+    └── memory_worker.py
+```
+
+- CLI entry point, command parsing, and background memory worker
+- `coder/cli/app.py` is the interactive entry
+
+### `core/`
+
+```text
+core/
+├── __init__.py
+├── agent.py
+├── compression.py
+├── conversation.py
+├── context_builder.py
+├── framework.py
+├── llm_client.py
+├── long_term_memory.py
+├── memory.py
+├── memory_pipeline.py
+├── prompts.py
+├── rag.py
+├── skills.py
+├── task_pipeline.py
+├── tools.py
+├── window_memory.py
+├── providers/
+│   ├── __init__.py
+│   ├── amap.py
+│   ├── base.py
+│   └── freeweb.py
+├── protocols/
+│   ├── __init__.py
+│   └── mcp/
+│       ├── __init__.py
+│       ├── client.py
+│       └── server.py
+└── product/
+    ├── __init__.py
+    ├── agents/
+    │   ├── __init__.py
+    │   └── react_agent.py
+    ├── conversation/
+    │   ├── __init__.py
+    │   └── manager.py
+    ├── memory/
+    │   ├── __init__.py
+    │   ├── long_term.py
+    │   ├── pipeline.py
+    │   └── working.py
+    ├── prompts/
+    │   ├── __init__.py
+    │   └── templates.py
+    ├── rag/
+    │   ├── __init__.py
+    │   └── knowledge_base.py
+    ├── skills/
+    │   └── __init__.py
+    └── tools/
+        ├── __init__.py
+        └── catalog.py
+```
+
+- `core/` is the low-level runtime and compatibility layer
+- `core/product/` is the more product-facing wrapper layer
+- `core/providers/` packages external capabilities into providers
+- `core/protocols/mcp/` implements the JSON-line MCP client/server
+
+### `skills/`
+
+```text
+skills/
+├── engineering-exploration/
+│   ├── SKILL.md
+│   ├── agents/
+│   │   └── openai.yaml
+│   └── references/
+│       ├── capability-design.md
+│       ├── engineering-design-dimensions.md
+│       ├── exploration-boundaries.md
+│       └── platform-portability.md
+└── engineering-exploration-skill/
+    ├── README.md
+    └── engineering-exploration.zip
+```
+
+- `skills/engineering-exploration/` is the skill runtime actually loads
+- `skills/engineering-exploration-skill/` keeps the downloaded source bundle for traceability
+
+### `scripts/`
+
+```text
+scripts/
+└── skill_smoke_test.py
+```
+
+- Offline validation for explicit and implicit skill activation
+
+### `examples/`
+
+```text
+examples/
+├── debug_freeweb_mcp.py
+├── main.py
+├── memory_playground.py
+├── qdrant_rag_demo.py
+├── rag_demo.py
+├── trace_run.py
+├── trace_three_step_qa.py
+└── working_memory_demo.py
+```
+
+- Demos, debug scripts, and trace samples
+
+### `knowledge_base/`
+
+```text
+knowledge_base/
+├── chapter8_learning_path.md
+├── project_notes.md
+├── rag_basics.md
+└── rag_table_notes.csv
+```
+
+- Local RAG corpus
+
+### `freeweb/`
+
+```text
+freeweb/
+├── src/
+├── tests/
+├── README.md
+├── AGENTS.md
+├── CHANGELOG.md
+└── package.json
+```
+
+- Optional web tooling submodule used by the FreeWeb provider
+
+### `langchain_core/`
+
+```text
+langchain_core/
+├── __init__.py
+└── messages.py
+```
+
+- Lightweight LangChain message compatibility layer
+
+### `langgraph/`
+
+```text
+langgraph/
+├── __init__.py
+├── graph.py
+└── checkpoint/
+    ├── __init__.py
+    └── memory.py
+```
+
+- Local LangGraph-style compatibility implementation
+
+### `data/`
+
+```text
+data/
+└── (runtime generated)
+```
+
+- Runtime session, window memory, and global memory state
 
 ## Terminal Commands
 

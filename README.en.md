@@ -81,14 +81,40 @@ FreeWeb MCP tools include:
 - `screenshot`
 - `inspect_llms_txt`
 
-## Core Layout
+## Project Structure
 
-- `coder/` - CLI entry point, command parsing, background memory worker
+```text
+micro-agent/
+├── coder/
+│   └── cli/
+├── core/
+│   ├── providers/
+│   ├── protocols/
+│   └── product/
+├── skills/
+│   └── engineering-exploration/
+├── scripts/
+├── examples/
+├── knowledge_base/
+├── freeweb/
+├── langchain_core/
+├── langgraph/
+└── data/
+```
+
+- `coder/` - CLI entry point, command parsing, and background memory worker
+- `core/` - agent runtime, memory, RAG, tools, and MCP compatibility code
 - `core/product/` - product-facing wrappers; read these first
-- `core/` - low-level agent, memory, RAG, tools, and MCP compatibility code
-- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
-- `knowledge_base/` - local RAG corpus
+- `core/providers/` - external capability providers
+- `core/protocols/` - MCP and other protocol-layer code
+- `skills/` - installed local capability packs
+- `scripts/` - offline smoke tests and helper scripts
 - `examples/` - demos, traces, and compression logs
+- `knowledge_base/` - local RAG corpus
+- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
+- `langchain_core/` - lightweight message compatibility layer
+- `langgraph/` - local state machine compatibility implementation
+- `data/` - runtime session, window memory, and global memory state
 
 If the submodule is missing after clone, run:
 

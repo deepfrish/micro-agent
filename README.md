@@ -85,14 +85,40 @@ FreeWeb MCP 工具：
 - `screenshot`
 - `inspect_llms_txt`
 
-## 核心目录
+## 项目结构
+
+```text
+micro-agent/
+├── coder/
+│   └── cli/
+├── core/
+│   ├── providers/
+│   ├── protocols/
+│   └── product/
+├── skills/
+│   └── engineering-exploration/
+├── scripts/
+├── examples/
+├── knowledge_base/
+├── freeweb/
+├── langchain_core/
+├── langgraph/
+└── data/
+```
 
 - `coder/`：CLI 入口、命令解析、后台记忆 worker
+- `core/`：底层 agent、记忆、RAG、工具和 MCP 兼容实现
 - `core/product/`：面向产品层的封装，建议优先阅读
-- `core/`：底层 agent、记忆、RAG、工具、MCP 兼容实现
-- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
-- `knowledge_base/`：本地 RAG 语料
+- `core/providers/`：外部能力 provider
+- `core/protocols/`：MCP 等协议层实现
+- `skills/`：本地能力包目录
+- `scripts/`：离线 smoke test 和辅助脚本
 - `examples/`：演示、调试脚本、轨迹日志
+- `knowledge_base/`：本地 RAG 语料
+- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
+- `langchain_core/`：轻量 message 兼容层
+- `langgraph/`：本地状态机兼容实现
+- `data/`：运行时生成的会话、窗口记忆和全局记忆
 
 如果 clone 后缺少 `freeweb/` 子模块，运行：
 
