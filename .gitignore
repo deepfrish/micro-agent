@@ -1,0 +1,6 @@
+.env
+data/
+examples/*_log.jsonl
+__pycache__/
+*.pyc
+.venv_deps/

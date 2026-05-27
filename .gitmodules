@@ -1,0 +1,3 @@
+[submodule "freeweb"]
+	path = freeweb
+	url = https://github.com/xenitV1/freeweb.git

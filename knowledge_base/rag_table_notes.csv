@@ -1,0 +1,6 @@
+topic,description,stage
+WorkingMemory,保存当前会话里的关键事实,基础记忆
+WindowMemory,退出聊天窗口时由 LLM 提炼窗口记忆快照,窗口记忆
+GlobalMemory,由 LLM 合并窗口记忆和已有长期记忆并跨窗口使用,长期记忆
+RAG,从外部知识库检索相关片段并拼进上下文,检索增强
+Qdrant,保存和搜索向量化后的知识库文档 chunk,向量数据库
