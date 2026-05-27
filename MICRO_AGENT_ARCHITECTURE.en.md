@@ -1,6 +1,6 @@
 # micro-agent Architecture Guide
 
-This document is written for future Codex runs and maintainers. It explains the project structure, turn flow, memory model, RAG logic, and terminal commands.
+This guide explains the project structure, turn flow, memory model, RAG logic, and terminal commands.
 
 ## High-Level View
 
