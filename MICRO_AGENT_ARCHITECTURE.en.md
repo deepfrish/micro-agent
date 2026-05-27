@@ -5,23 +5,25 @@ This guide explains the project structure, turn flow, memory model, RAG logic, a
 ## High-Level View
 
 ```mermaid
-flowchart TD
-    U[User] --> C[CLI / coder]
-    C --> M[ConversationManager]
-    M --> R{Turn Router}
-    R -->|memory| W1[Memory reply]
-    R -->|direct| D1[Direct reply]
-    R -->|react| A[ReAct graph]
-    M --> G[Global memory router]
-    M --> K[RAG router]
-    A --> T[Tools / MCP / local tools]
-    W1 --> O[Answer]
-    D1 --> O
-    A --> O
-    O --> S[Save session]
-    S --> E[Exit consolidator on /exit]
-    E --> W[Window memory]
-    E --> L[Global memory]
+graph TD
+    U["User"] --> CLI["CLI"]
+    CLI --> CM["ConversationManager"]
+    CM --> TR{"Turn Router"}
+    TR --> MR["Memory reply"]
+    TR --> DR["Direct reply"]
+    TR --> RG["ReAct graph"]
+    MR --> ANS["Answer"]
+    DR --> ANS
+    RG --> TOOLS["Tools / MCP / local tools"]
+    TOOLS --> ANS
+    ANS --> SAVE["Save session"]
+```
+
+```mermaid
+graph TD
+    SAVE["Save session"] --> EXIT["/exit consolidator"]
+    EXIT --> WM["Window memory"]
+    EXIT --> GM["Global memory"]
 ```
 
 ## Main Entry Points
@@ -257,13 +259,86 @@ Common tools:
 
 The conversation layer can bias a turn toward web tools with `/net on` or `/net once`.
 
-## Skill Layer
+## Module Layout
 
-Code: `core/skills.py`, `core/conversation.py`, `core/context_builder.py`, `core/memory_pipeline.py`, `core/task_pipeline.py`
+### `coder/`
 
-Skill is a task capability layer, not a low-level tool. It injects a playbook, boundaries, output requirements, and references into the conversation flow.
+```text
+coder/
+├── __main__.py
+└── cli/
+    ├── __init__.py
+    ├── app.py
+    ├── commands.py
+    └── memory_worker.py
+```
 
-### Directory Layout
+- CLI entry point, command parsing, and background memory worker
+- `coder/cli/app.py` is the interactive entry
+
+### `core/`
+
+```text
+core/
+├── __init__.py
+├── agent.py
+├── compression.py
+├── conversation.py
+├── context_builder.py
+├── framework.py
+├── llm_client.py
+├── long_term_memory.py
+├── memory.py
+├── memory_pipeline.py
+├── prompts.py
+├── rag.py
+├── skills.py
+├── task_pipeline.py
+├── tools.py
+├── window_memory.py
+├── providers/
+│   ├── __init__.py
+│   ├── amap.py
+│   ├── base.py
+│   └── freeweb.py
+├── protocols/
+│   ├── __init__.py
+│   └── mcp/
+│       ├── __init__.py
+│       ├── client.py
+│       └── server.py
+└── product/
+    ├── __init__.py
+    ├── agents/
+    │   ├── __init__.py
+    │   └── react_agent.py
+    ├── conversation/
+    │   ├── __init__.py
+    │   └── manager.py
+    ├── memory/
+    │   ├── __init__.py
+    │   ├── long_term.py
+    │   ├── pipeline.py
+    │   └── working.py
+    ├── prompts/
+    │   ├── __init__.py
+    │   └── templates.py
+    ├── rag/
+    │   ├── __init__.py
+    │   └── knowledge_base.py
+    ├── skills/
+    │   └── __init__.py
+    └── tools/
+        ├── __init__.py
+        └── catalog.py
+```
+
+- `core/` is the low-level runtime and compatibility layer
+- `core/product/` is the more product-facing wrapper layer
+- `core/providers/` packages external capabilities into providers
+- `core/protocols/mcp/` implements the JSON-line MCP client/server
+
+### `skills/`
 
 ```text
 skills/
@@ -283,41 +358,89 @@ skills/
 
 - `skills/engineering-exploration/` is the skill runtime actually loads
 - `skills/engineering-exploration-skill/` keeps the downloaded source bundle for traceability
-- `SKILL.md` defines triggers, allowed/disallowed actions, output contract, and reference navigation
-- `agents/openai.yaml` holds display metadata and the default prompt
-- `references/` stores optional design references that are loaded on demand
 
-### Activation
+### `scripts/`
 
-- Explicit calls like "use xxx skill" or "使用 xxxskill" activate the matching skill directly
-- Implicit calls use `SkillRouter` to decide whether a skill should be activated, with heuristic fallback
-- The selected skill is injected as its own system context block
-- That context influences `TurnRouter`, `TaskPlanner`, and direct replies
+```text
+scripts/
+└── skill_smoke_test.py
+```
 
-### Runtime Flow
+- Offline validation for explicit and implicit skill activation
 
-1. `ConversationManager.ask()` resolves skills first
-2. The chosen skill is written into session `skill_state`
-3. `ContextBuilder` turns skill content into a dedicated system block
-4. `TurnRouter` and `TaskPlanner` read the skill context
-5. The final answer stays aligned with the skill's boundaries, style, and output contract
+### `examples/`
 
-### Current Example
+```text
+examples/
+├── debug_freeweb_mcp.py
+├── main.py
+├── memory_playground.py
+├── qdrant_rag_demo.py
+├── rag_demo.py
+├── trace_run.py
+├── trace_three_step_qa.py
+└── working_memory_demo.py
+```
 
-- `skills/engineering-exploration/` is an exploration and planning skill
-- `scripts/skill_smoke_test.py` verifies explicit and implicit skill activation offline
+- Demos, debug scripts, and trace samples
 
-## Repository Layout
+### `knowledge_base/`
 
-- `coder/` - CLI entry point, command parsing, background memory worker
-- `core/product/` - product-facing wrappers; read these first
-- `core/` - low-level agent, memory, RAG, tools, and MCP compatibility code
-- `skills/` - installed local skills
-- `scripts/` - offline smoke tests and helper scripts
-- `examples/` - demos, traces, and compression logs
-- `knowledge_base/` - local RAG corpus
-- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
-- `data/` - runtime session, window memory, and global memory state
+```text
+knowledge_base/
+├── chapter8_learning_path.md
+├── project_notes.md
+├── rag_basics.md
+└── rag_table_notes.csv
+```
+
+- Local RAG corpus
+
+### `freeweb/`
+
+```text
+freeweb/
+├── src/
+├── tests/
+├── README.md
+├── AGENTS.md
+├── CHANGELOG.md
+└── package.json
+```
+
+- Optional web tooling submodule used by the FreeWeb provider
+
+### `langchain_core/`
+
+```text
+langchain_core/
+├── __init__.py
+└── messages.py
+```
+
+- Lightweight LangChain message compatibility layer
+
+### `langgraph/`
+
+```text
+langgraph/
+├── __init__.py
+├── graph.py
+└── checkpoint/
+    ├── __init__.py
+    └── memory.py
+```
+
+- Local LangGraph-style compatibility implementation
+
+### `data/`
+
+```text
+data/
+└── (runtime generated)
+```
+
+- Runtime session, window memory, and global memory state
 
 ## Terminal Commands
 

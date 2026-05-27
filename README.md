@@ -85,54 +85,40 @@ FreeWeb MCP 工具：
 - `screenshot`
 - `inspect_llms_txt`
 
-## Skill 层
-
-skill 是一层“任务能力包”，不是底层工具。它会把一类任务的做法、边界和输出方式注入到现有对话流程里。
-
-### 当前 skill 目录
+## 项目结构
 
 ```text
-skills/
-├── engineering-exploration/
-│   ├── SKILL.md
-│   ├── agents/
-│   │   └── openai.yaml
-│   └── references/
-│       ├── capability-design.md
-│       ├── engineering-design-dimensions.md
-│       ├── exploration-boundaries.md
-│       └── platform-portability.md
-└── engineering-exploration-skill/
-    ├── README.md
-    └── engineering-exploration.zip
+micro-agent/
+├── coder/
+│   └── cli/
+├── core/
+│   ├── providers/
+│   ├── protocols/
+│   └── product/
+├── skills/
+│   └── engineering-exploration/
+├── scripts/
+├── examples/
+├── knowledge_base/
+├── freeweb/
+├── langchain_core/
+├── langgraph/
+└── data/
 ```
 
-- `skills/engineering-exploration/`：当前真正被运行时加载的 skill
-- `skills/engineering-exploration-skill/`：下载下来的原始仓库和压缩包，方便追踪来源
-- `SKILL.md`：skill 主说明，定义触发场景、允许/禁止动作和输出契约
-- `agents/openai.yaml`：Codex 侧展示信息和默认提示
-- `references/`：按需读取的设计参考
-
-### 触发方式
-
-- 显性调用：用户说“使用 xxxskill”“用 xxx skill”时直接命中
-- 隐性调用：模型根据任务语义自动选择 skill
-- 命中的 skill 会作为独立 system 上下文注入对话流程，并影响路由、任务拆分和回答风格
-
-## 核心目录
-
 - `coder/`：CLI 入口、命令解析、后台记忆 worker
+- `core/`：底层 agent、记忆、RAG、工具和 MCP 兼容实现
 - `core/product/`：面向产品层的封装，建议优先阅读
-- `core/`：底层 agent、记忆、RAG、工具、MCP 兼容实现
-- `skills/`：本地安装的 skill 包
+- `core/providers/`：外部能力 provider
+- `core/protocols/`：MCP 等协议层实现
+- `skills/`：本地能力包目录
 - `scripts/`：离线 smoke test 和辅助脚本
-- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
-- `knowledge_base/`：本地 RAG 语料
 - `examples/`：演示、调试脚本、轨迹日志
+- `knowledge_base/`：本地 RAG 语料
+- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
+- `langchain_core/`：轻量 message 兼容层
+- `langgraph/`：本地状态机兼容实现
 - `data/`：运行时生成的会话、窗口记忆和全局记忆
-- `core/skills.py`：skill 加载、匹配、显性/隐性路由
-- `core/conversation.py`：把 skill 注入到会话、路由和任务执行
-- `core/context_builder.py`：把 skill 作为独立上下文块拼装进 prompt
 
 如果 clone 后缺少 `freeweb/` 子模块，运行：
 

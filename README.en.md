@@ -81,54 +81,40 @@ FreeWeb MCP tools include:
 - `screenshot`
 - `inspect_llms_txt`
 
-## Skill Layer
-
-Skill is a task capability layer, not a low-level tool. It injects a task playbook, boundaries, and output shape into the existing conversation flow.
-
-### Current Skill Layout
+## Project Structure
 
 ```text
-skills/
-├── engineering-exploration/
-│   ├── SKILL.md
-│   ├── agents/
-│   │   └── openai.yaml
-│   └── references/
-│       ├── capability-design.md
-│       ├── engineering-design-dimensions.md
-│       ├── exploration-boundaries.md
-│       └── platform-portability.md
-└── engineering-exploration-skill/
-    ├── README.md
-    └── engineering-exploration.zip
+micro-agent/
+├── coder/
+│   └── cli/
+├── core/
+│   ├── providers/
+│   ├── protocols/
+│   └── product/
+├── skills/
+│   └── engineering-exploration/
+├── scripts/
+├── examples/
+├── knowledge_base/
+├── freeweb/
+├── langchain_core/
+├── langgraph/
+└── data/
 ```
 
-- `skills/engineering-exploration/` - the skill that runtime actually loads
-- `skills/engineering-exploration-skill/` - the downloaded source repo and zip bundle for traceability
-- `SKILL.md` - the skill entry document: triggers, allowed/disallowed actions, and output contract
-- `agents/openai.yaml` - Codex-facing metadata and default prompt
-- `references/` - supplemental design references loaded on demand
-
-### Activation
-
-- Explicit calls like "use xxx skill" or "使用 xxxskill" activate a matching skill directly
-- Implicit calls let the model choose a skill when the task benefits from it
-- The selected skill is injected as its own system context block and influences routing, task splitting, and answer style
-
-## Core Layout
-
-- `coder/` - CLI entry point, command parsing, background memory worker
+- `coder/` - CLI entry point, command parsing, and background memory worker
+- `core/` - agent runtime, memory, RAG, tools, and MCP compatibility code
 - `core/product/` - product-facing wrappers; read these first
-- `core/` - low-level agent, memory, RAG, tools, and MCP compatibility code
-- `skills/` - installed local skills
+- `core/providers/` - external capability providers
+- `core/protocols/` - MCP and other protocol-layer code
+- `skills/` - installed local capability packs
 - `scripts/` - offline smoke tests and helper scripts
-- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
-- `knowledge_base/` - local RAG corpus
 - `examples/` - demos, traces, and compression logs
+- `knowledge_base/` - local RAG corpus
+- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
+- `langchain_core/` - lightweight message compatibility layer
+- `langgraph/` - local state machine compatibility implementation
 - `data/` - runtime session, window memory, and global memory state
-- `core/skills.py` - skill loading, matching, and explicit/implicit routing
-- `core/conversation.py` - injects skill state into sessions, routing, and task execution
-- `core/context_builder.py` - adds skill content as a dedicated prompt block
 
 If the submodule is missing after clone, run:
 

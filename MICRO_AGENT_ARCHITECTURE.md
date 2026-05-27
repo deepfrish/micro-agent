@@ -5,23 +5,25 @@
 ## 总览
 
 ```mermaid
-flowchart TD
-    U[User] --> C[CLI / coder]
-    C --> M[ConversationManager]
-    M --> R{Turn Router}
-    R -->|memory| W1[Memory reply]
-    R -->|direct| D1[Direct reply]
-    R -->|react| A[ReAct graph]
-    M --> G[Global memory router]
-    M --> K[RAG router]
-    A --> T[Tools / MCP / local tools]
-    W1 --> O[Answer]
-    D1 --> O
-    A --> O
-    O --> S[Save session]
-    S --> E[Exit consolidator on /exit]
-    E --> W[Window memory]
-    E --> L[Global memory]
+graph TD
+    U["User"] --> CLI["CLI"]
+    CLI --> CM["ConversationManager"]
+    CM --> TR{"Turn Router"}
+    TR --> MR["Memory reply"]
+    TR --> DR["Direct reply"]
+    TR --> RG["ReAct graph"]
+    MR --> ANS["Answer"]
+    DR --> ANS
+    RG --> TOOLS["Tools / MCP / local tools"]
+    TOOLS --> ANS
+    ANS --> SAVE["Save session"]
+```
+
+```mermaid
+graph TD
+    SAVE["Save session"] --> EXIT["/exit consolidator"]
+    EXIT --> WM["Window memory"]
+    EXIT --> GM["Global memory"]
 ```
 
 ## 主要入口
@@ -257,13 +259,86 @@ Provider：`core/providers/freeweb.py`
 
 对话层可以用 `/net on` 或 `/net once` 偏向网页工具。
 
-## Skill 层
+## 模块目录
 
-代码位置：`core/skills.py`、`core/conversation.py`、`core/context_builder.py`、`core/memory_pipeline.py`、`core/task_pipeline.py`
+### `coder/`
 
-skill 是任务能力层，不是底层 tool。它把一类任务的做法、边界、输出要求和参考资料，作为独立上下文注入现有对话链路。
+```text
+coder/
+├── __main__.py
+└── cli/
+    ├── __init__.py
+    ├── app.py
+    ├── commands.py
+    └── memory_worker.py
+```
 
-### 目录结构
+- CLI 入口、命令解析、后台记忆 worker
+- `coder/cli/app.py` 是交互式入口
+
+### `core/`
+
+```text
+core/
+├── __init__.py
+├── agent.py
+├── compression.py
+├── conversation.py
+├── context_builder.py
+├── framework.py
+├── llm_client.py
+├── long_term_memory.py
+├── memory.py
+├── memory_pipeline.py
+├── prompts.py
+├── rag.py
+├── skills.py
+├── task_pipeline.py
+├── tools.py
+├── window_memory.py
+├── providers/
+│   ├── __init__.py
+│   ├── amap.py
+│   ├── base.py
+│   └── freeweb.py
+├── protocols/
+│   ├── __init__.py
+│   └── mcp/
+│       ├── __init__.py
+│       ├── client.py
+│       └── server.py
+└── product/
+    ├── __init__.py
+    ├── agents/
+    │   ├── __init__.py
+    │   └── react_agent.py
+    ├── conversation/
+    │   ├── __init__.py
+    │   └── manager.py
+    ├── memory/
+    │   ├── __init__.py
+    │   ├── long_term.py
+    │   ├── pipeline.py
+    │   └── working.py
+    ├── prompts/
+    │   ├── __init__.py
+    │   └── templates.py
+    ├── rag/
+    │   ├── __init__.py
+    │   └── knowledge_base.py
+    ├── skills/
+    │   └── __init__.py
+    └── tools/
+        ├── __init__.py
+        └── catalog.py
+```
+
+- `core/` 是底层运行时和兼容实现
+- `core/product/` 是更偏产品层的封装，阅读优先级更高
+- `core/providers/` 把外部能力包装成 provider
+- `core/protocols/mcp/` 实现 JSON-line MCP client/server
+
+### `skills/`
 
 ```text
 skills/
@@ -281,43 +356,91 @@ skills/
     └── engineering-exploration.zip
 ```
 
-- `skills/engineering-exploration/`：runtime 真正加载的 skill
-- `skills/engineering-exploration-skill/`：下载得到的来源包，保留为普通目录
-- `SKILL.md`：定义触发场景、允许/禁止动作、输出契约和参考导航
-- `agents/openai.yaml`：显示名、短描述和默认 prompt
-- `references/`：按需读取的设计参考
+- `skills/engineering-exploration/` 是 runtime 实际加载的 skill
+- `skills/engineering-exploration-skill/` 保留下载来源包，便于追溯
 
-### 调用方式
+### `scripts/`
 
-- 显性调用：用户说“使用 xxxskill”“用 xxx skill”时直接命中
-- 隐性调用：`SkillRouter` 通过 LLM 判断是否激活 skill，必要时用启发式兜底
-- 命中的 skill 会作为独立 system 上下文注入 `ContextBuilder`
-- skill 上下文会影响 `TurnRouter`、`TaskPlanner` 和直接回答的语气与约束
+```text
+scripts/
+└── skill_smoke_test.py
+```
 
-### 运行流
+- 离线验证显性和隐性 skill 触发是否生效
 
-1. `ConversationManager.ask()` 先做 skill 识别
-2. 命中的 skill 写入 session 的 `skill_state`
-3. `ContextBuilder` 把 skill 内容拼成独立 system block
-4. `TurnRouter` 和 `TaskPlanner` 读取 skill 上下文
-5. 最终回答保持和 skill 的边界、风格、输出要求一致
+### `examples/`
 
-### 当前示例
+```text
+examples/
+├── debug_freeweb_mcp.py
+├── main.py
+├── memory_playground.py
+├── qdrant_rag_demo.py
+├── rag_demo.py
+├── trace_run.py
+├── trace_three_step_qa.py
+└── working_memory_demo.py
+```
 
-- `skills/engineering-exploration/`：探索/规划型 skill，适合先讨论方案、边界和实现路径
-- `scripts/skill_smoke_test.py`：离线验证显性和隐性 skill 触发是否生效
+- 演示、调试脚本和轨迹日志样例
 
-## 代码与文件结构
+### `knowledge_base/`
 
-- `coder/`：CLI 入口、命令解析、后台记忆 worker
-- `core/product/`：面向产品层的封装，建议优先阅读
-- `core/`：底层 agent、记忆、RAG、工具、MCP 兼容实现
-- `skills/`：本地安装的 skill 包
-- `scripts/`：离线 smoke test 和辅助脚本
-- `examples/`：演示、调试脚本、轨迹日志
-- `knowledge_base/`：本地 RAG 语料
-- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
-- `data/`：运行时生成的会话、窗口记忆和全局记忆
+```text
+knowledge_base/
+├── chapter8_learning_path.md
+├── project_notes.md
+├── rag_basics.md
+└── rag_table_notes.csv
+```
+
+- 本地 RAG 语料
+
+### `freeweb/`
+
+```text
+freeweb/
+├── src/
+├── tests/
+├── README.md
+├── AGENTS.md
+├── CHANGELOG.md
+└── package.json
+```
+
+- 可选网页工具子模块，供 FreeWeb provider 使用
+
+### `langchain_core/`
+
+```text
+langchain_core/
+├── __init__.py
+└── messages.py
+```
+
+- 轻量 LangChain message 兼容层
+
+### `langgraph/`
+
+```text
+langgraph/
+├── __init__.py
+├── graph.py
+└── checkpoint/
+    ├── __init__.py
+    └── memory.py
+```
+
+- 本地 LangGraph 风格兼容实现
+
+### `data/`
+
+```text
+data/
+└── (runtime generated)
+```
+
+- 运行时生成的会话、窗口记忆和全局记忆
 
 ## 终端命令
 
