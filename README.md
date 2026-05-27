@@ -85,14 +85,26 @@ FreeWeb MCP 工具：
 - `screenshot`
 - `inspect_llms_txt`
 
+## Skill 层
+
+- `skills/<skill-id>/`：本地 skill 安装目录，包含 `SKILL.md`、可选 `agents/openai.yaml` 和 `references/`
+- `skills/engineering-exploration/`：当前已安装的探索型 skill
+- `skills/engineering-exploration-skill/`：下载得到的原始仓库，运行时以 `skills/engineering-exploration/` 为准
+- 显性调用：用户说“使用 xxxskill”“用 xxx skill”时直接命中
+- 隐性调用：模型根据任务语义自动选择 skill
+- skill 内容会作为独立 system 上下文注入对话流程
+
 ## 核心目录
 
 - `coder/`：CLI 入口、命令解析、后台记忆 worker
 - `core/product/`：面向产品层的封装，建议优先阅读
 - `core/`：底层 agent、记忆、RAG、工具、MCP 兼容实现
+- `skills/`：本地安装的 skill 包
+- `scripts/`：离线 smoke test 和辅助脚本
 - `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
 - `knowledge_base/`：本地 RAG 语料
 - `examples/`：演示、调试脚本、轨迹日志
+- `data/`：运行时生成的会话、窗口记忆和全局记忆
 
 如果 clone 后缺少 `freeweb/` 子模块，运行：
 

@@ -7,6 +7,7 @@ from .memory_pipeline import ExitMemoryConsolidator, GlobalMemoryRouter, RAGRout
 from .compression import WindowCompressor
 from .context_builder import ContextBuildResult, ContextBuilder, ContextBuilderConfig
 from .prompts import TASK_SPLIT_PROMPT, TASK_SYNTHESIS_PROMPT, WINDOW_FACT_RECALL_PROMPT, WINDOW_MISSING_POINT_VERIFICATION_PROMPT
+from .skills import SkillDefinition, SkillRegistry, SkillResolution, SkillRouter
 from .window_memory import WindowMemoryStore
 from .task_pipeline import TaskPlanner, TaskSynthesizer
 from .rag import (
@@ -73,6 +74,10 @@ __all__ = [
     "QdrantKnowledgeBase",
     "QdrantVectorStore",
     "SearchHit",
+    "SkillDefinition",
+    "SkillRegistry",
+    "SkillResolution",
+    "SkillRouter",
     "chunk_text",
     "read_document",
     "WorkingMemory",

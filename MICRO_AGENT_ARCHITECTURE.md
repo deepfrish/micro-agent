@@ -9,13 +9,14 @@ flowchart TD
     U[User] --> C[CLI / coder]
     C --> M[ConversationManager]
     M --> R{Turn Router}
-    R -->|memory| D[Direct reply]
-    R -->|direct| D
+    R -->|memory| W1[Memory reply]
+    R -->|direct| D1[Direct reply]
     R -->|react| A[ReAct graph]
     M --> G[Global memory router]
     M --> K[RAG router]
     A --> T[Tools / MCP / local tools]
-    D --> O[Answer]
+    W1 --> O[Answer]
+    D1 --> O
     A --> O
     O --> S[Save session]
     S --> E[Exit consolidator on /exit]
@@ -145,12 +146,12 @@ ReAct 图包含这些节点：
 
 ```mermaid
 flowchart LR
-    U[User turn] --> W[WorkingMemory]
+    U[User turn] --> WM[Working memory]
     U --> H[chat_sessions.json]
     H --> X[Exit consolidation]
-    X --> WM[window_memory.json]
-    X --> GM[global_memory.json]
-    GM --> Q[rank / search / pinned]
+    X --> WMN[window_memory.json]
+    X --> GMN[global_memory.json]
+    GMN --> IDX[Rank, search, pinned]
 ```
 
 ## RAG 逻辑
@@ -255,6 +256,29 @@ Provider：`core/providers/freeweb.py`
 | `inspect_llms_txt` | 检查 `llms.txt` 指引 |
 
 对话层可以用 `/net on` 或 `/net once` 偏向网页工具。
+
+## Skill 层
+
+代码位置：`core/skills.py`、`core/product/skills/`、`skills/`
+
+- `SkillRegistry` 扫描 `skills/<skill-id>/SKILL.md`，并读取可选的 `agents/openai.yaml` 和 `references/`
+- 显性调用：用户说“使用 xxxskill”“用 xxx skill”时直接命中
+- 隐性调用：`SkillRouter` 通过 LLM 判断是否激活 skill，必要时用启发式兜底
+- 命中的 skill 会作为独立 system 上下文注入 `ContextBuilder`，并影响 `TurnRouter`、`TaskPlanner` 和直接回答
+- 当前已安装的示例 skill 是 `skills/engineering-exploration/`
+- 下载得到的原始仓库保留在 `skills/engineering-exploration-skill/`，runtime 以 `skills/engineering-exploration/` 为准
+
+## 代码与文件结构
+
+- `coder/`：CLI 入口、命令解析、后台记忆 worker
+- `core/product/`：面向产品层的封装，建议优先阅读
+- `core/`：底层 agent、记忆、RAG、工具、MCP 兼容实现
+- `skills/`：本地安装的 skill 包
+- `scripts/`：离线 smoke test 和辅助脚本
+- `examples/`：演示、调试脚本、轨迹日志
+- `knowledge_base/`：本地 RAG 语料
+- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
+- `data/`：运行时生成的会话、窗口记忆和全局记忆
 
 ## 终端命令
 

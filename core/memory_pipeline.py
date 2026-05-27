@@ -141,7 +141,7 @@ class TurnRouter:
     def __init__(self, client: Any) -> None:
         self.client = client
 
-    def route(self, question: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
+    def route(self, question: str, history: List[Dict[str, str]], skill_context: str = "") -> Dict[str, Any]:
         try:
             raw = self.client.chat(
                 [
@@ -150,6 +150,7 @@ class TurnRouter:
                         "role": "user",
                         "content": (
                             f"Conversation history:\n{_history_tail(history)}\n\n"
+                            f"Active skill guidance:\n{skill_context.strip() or 'No active skill.'}\n\n"
                             f"Current question:\n{question}"
                         ),
                     },

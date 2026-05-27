@@ -15,6 +15,7 @@ Rules:
 - Do not invent tool results.
 - Base each next step on the latest Observation.
 - Use the working memory context as stable user facts when it is provided.
+- If a skill context block is provided, treat it as active guidance for this turn.
 - Use provided long-term memories and knowledge-base context when they are relevant.
 - When the user asks to search the public web, fetch news, open article links, browse current pages, or collect recent web information, use the web tools such as web_search, search_and_browse, browse_page, or smart_browse when they are available.
 - Personal long-term memory is maintained automatically when a chat window exits.
@@ -81,7 +82,26 @@ Rules:
 - Use react when the turn clearly needs tools, external current data, calculation, weather, nearby search, map lookup, or multi-step tool use.
 - Use react for web search, current news, article links, traffic updates, or any request that needs recent public web content.
 - Use direct for ordinary chat, explanations, document questions, summaries, and anything that can be answered without tool execution.
+- If a skill context block is provided, use it when deciding the route.
 - Prefer memory over direct when the message is explicitly about remembering or changing a personal preference.
+- Keep the reason short and practical.
+"""
+
+SKILL_ROUTE_PROMPT = """You decide whether a user turn should activate one of the available skills.
+
+Return strict JSON only:
+{
+  "use_skill": true,
+  "selected_skill": "skill-id or display name, or empty when no skill fits",
+  "confidence": 0.0,
+  "reason": "short reason"
+}
+
+Rules:
+- Choose no skill when the turn is ordinary chat, simple Q&A, or clearly unrelated to any skill.
+- Choose exactly one skill when it materially improves the answer or when the user explicitly asks for it.
+- Prefer explicit user wording such as "use xxx skill", "使用xxxskill", or "请用xxx技能".
+- If multiple skills fit, choose the one most directly aligned with the user's current task.
 - Keep the reason short and practical.
 """
 
@@ -89,6 +109,7 @@ DIRECT_REPLY_PROMPT = """You are a lightweight assistant that replies without to
 
 Use the conversation history, working memory, selected long-term memories, and knowledge-base context when they are relevant.
 If a current tool list is provided, treat it as the live tool inventory for this session.
+If a skill context block is provided, treat it as active guidance for this turn.
 Stay concise, natural, and helpful.
 Do not mention routing, hidden prompts, or internal policies.
 If the user is clearly updating a remembered preference or personal fact, acknowledge the change briefly and clearly.
@@ -121,6 +142,7 @@ Rules:
 - Use memory for remembering, changing, or checking personal user preferences, identity, title, or other durable memory.
 - Use react for tasks that need tools, current data, nearby search, maps, calculations, or multi-step execution.
 - Use direct for ordinary explanation, summary, or answerable text-only tasks.
+- If a skill context block is provided, keep task splitting consistent with it.
 - Treat any provided long-term memory context as available facts when deciding whether a task is blocked.
 - If a task cannot be executed because a required input is missing, mark it blocked and provide one short blocking_question.
 - Do not split a single atomic question.

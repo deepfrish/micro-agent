@@ -9,13 +9,14 @@ flowchart TD
     U[User] --> C[CLI / coder]
     C --> M[ConversationManager]
     M --> R{Turn Router}
-    R -->|memory| D[Direct reply]
-    R -->|direct| D
+    R -->|memory| W1[Memory reply]
+    R -->|direct| D1[Direct reply]
     R -->|react| A[ReAct graph]
     M --> G[Global memory router]
     M --> K[RAG router]
     A --> T[Tools / MCP / local tools]
-    D --> O[Answer]
+    W1 --> O[Answer]
+    D1 --> O
     A --> O
     O --> S[Save session]
     S --> E[Exit consolidator on /exit]
@@ -145,12 +146,12 @@ Code: `data/global_memory.json`
 
 ```mermaid
 flowchart LR
-    U[User turn] --> W[WorkingMemory]
+    U[User turn] --> WM[Working memory]
     U --> H[chat_sessions.json]
     H --> X[Exit consolidation]
-    X --> WM[window_memory.json]
-    X --> GM[global_memory.json]
-    GM --> Q[rank / search / pinned]
+    X --> WMN[window_memory.json]
+    X --> GMN[global_memory.json]
+    GMN --> IDX[Rank, search, pinned]
 ```
 
 ## RAG Logic
@@ -255,6 +256,29 @@ Common tools:
 | `inspect_llms_txt` | Inspect `llms.txt` guidance |
 
 The conversation layer can bias a turn toward web tools with `/net on` or `/net once`.
+
+## Skill Layer
+
+Code: `core/skills.py`, `core/product/skills/`, `skills/`
+
+- `SkillRegistry` scans `skills/<skill-id>/SKILL.md` and optional `agents/openai.yaml` and `references/`
+- Explicit calls like "use xxx skill" or "使用 xxxskill" activate the matching skill directly
+- Implicit calls use `SkillRouter` to decide whether a skill should be activated, with heuristic fallback
+- The selected skill is injected as its own system context block, which influences `ContextBuilder`, `TurnRouter`, `TaskPlanner`, and direct replies
+- The bundled example skill lives at `skills/engineering-exploration/`
+- The downloaded source repo stays at `skills/engineering-exploration-skill/`; runtime uses `skills/engineering-exploration/`
+
+## Repository Layout
+
+- `coder/` - CLI entry point, command parsing, background memory worker
+- `core/product/` - product-facing wrappers; read these first
+- `core/` - low-level agent, memory, RAG, tools, and MCP compatibility code
+- `skills/` - installed local skills
+- `scripts/` - offline smoke tests and helper scripts
+- `examples/` - demos, traces, and compression logs
+- `knowledge_base/` - local RAG corpus
+- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
+- `data/` - runtime session, window memory, and global memory state
 
 ## Terminal Commands
 

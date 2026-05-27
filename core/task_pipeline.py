@@ -80,6 +80,7 @@ class TaskPlanner:
         history: List[Dict[str, str]],
         memory_context: str = "",
         *,
+        skill_context: str = "",
         force_network: bool = False,
     ) -> Dict[str, Any]:
         if force_network:
@@ -92,6 +93,7 @@ class TaskPlanner:
         try:
             user_content = (
                 f"Conversation history:\n{_history_tail(history)}\n\n"
+                f"Active skill guidance:\n{skill_context.strip() or 'No active skill.'}\n\n"
                 f"Relevant long-term memories:\n{memory_context.strip() or 'No relevant long-term memories.'}\n\n"
                 f"Current question:\n{question}"
             )

@@ -81,14 +81,26 @@ FreeWeb MCP tools include:
 - `screenshot`
 - `inspect_llms_txt`
 
+## Skill Layer
+
+- `skills/<skill-id>/` - local skill install directory with `SKILL.md`, optional `agents/openai.yaml`, and `references/`
+- `skills/engineering-exploration/` - the bundled exploration skill
+- `skills/engineering-exploration-skill/` - the downloaded source repo; runtime uses `skills/engineering-exploration/`
+- Explicit calls like "use xxx skill" or "使用 xxxskill" activate a matching skill directly
+- Implicit calls let the model choose a skill when the task benefits from it
+- Selected skill content is injected as its own system context block in the conversation flow
+
 ## Core Layout
 
 - `coder/` - CLI entry point, command parsing, background memory worker
 - `core/product/` - product-facing wrappers; read these first
 - `core/` - low-level agent, memory, RAG, tools, and MCP compatibility code
+- `skills/` - installed local skills
+- `scripts/` - offline smoke tests and helper scripts
 - `freeweb/` - optional web tooling submodule used by the FreeWeb provider
 - `knowledge_base/` - local RAG corpus
 - `examples/` - demos, traces, and compression logs
+- `data/` - runtime session, window memory, and global memory state
 
 If the submodule is missing after clone, run:
 

@@ -85,6 +85,7 @@ class ContextBuilderConfig:
     max_memory_items: int = 6
     max_window_summary_chars: int = 1600
     max_working_memory_chars: int = 500
+    max_skill_chars: int = 2400
     max_memory_chars: int = 1600
     max_rag_chars: int = 2200
     max_tool_chars: int = 1200
@@ -107,6 +108,7 @@ class ContextBuilder:
         working_memory: str = "",
         compression_state: Mapping[str, Any] | None = None,
         long_term_memories: Sequence[Mapping[str, Any]] | None = None,
+        skill_context: str = "",
         rag_context: str = "",
         tool_list: str = "",
         include_tool_list: bool = False,
@@ -117,6 +119,7 @@ class ContextBuilder:
             working_memory=working_memory,
             compression_state=compression_state or {},
             long_term_memories=long_term_memories or [],
+            skill_context=skill_context,
             rag_context=rag_context,
             tool_list=tool_list,
             include_tool_list=include_tool_list,
@@ -149,6 +152,7 @@ class ContextBuilder:
         working_memory: str,
         compression_state: Mapping[str, Any],
         long_term_memories: Sequence[Mapping[str, Any]],
+        skill_context: str,
         rag_context: str,
         tool_list: str,
         include_tool_list: bool,
@@ -194,6 +198,20 @@ class ContextBuilder:
                     content=memory_text,
                     priority=88,
                     order=order,
+                )
+            )
+            order += 1
+
+        skill_text = self._format_skill_context(skill_context)
+        if skill_text:
+            blocks.append(
+                ContextBlock(
+                    name="skill_context",
+                    role="system",
+                    content=skill_text,
+                    priority=90,
+                    order=order,
+                    mandatory=True,
                 )
             )
             order += 1
@@ -260,6 +278,8 @@ class ContextBuilder:
                 cost = min(cost, self.config.max_window_summary_chars)
             elif block.name == "global_memory":
                 cost = min(cost, self.config.max_memory_chars)
+            elif block.name == "skill_context":
+                cost = min(cost, self.config.max_skill_chars)
             elif block.name == "rag_context":
                 cost = min(cost, self.config.max_rag_chars)
             elif block.name == "tool_list":
@@ -391,6 +411,13 @@ class ContextBuilder:
             + cleaned,
             self.config.max_rag_chars,
         )
+
+    @staticmethod
+    def _format_skill_context(skill_context: str) -> str:
+        cleaned = _normalize_text(skill_context)
+        if not cleaned:
+            return ""
+        return ContextBuilder._truncate_text("Active skill context:\n" + cleaned, 2400)
 
     @staticmethod
     def _truncate_text(text: str, limit: int) -> str:
