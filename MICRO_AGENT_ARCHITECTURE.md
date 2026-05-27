@@ -31,6 +31,69 @@ flowchart TD
 - `core/agent.py` runs the ReAct graph
 - `freeweb/` is an optional submodule for local web tooling; use `git submodule update --init --recursive` after cloning if it is absent
 
+## Technology Stack
+
+### Python Runtime
+
+Most of the project is Python:
+
+- `coder/` provides the terminal application
+- `core/` provides the agent runtime, tool registry, memory stores, RAG, prompt builders, and MCP client/server code
+- `examples/` contains demos and trace scripts
+
+The current Python dependencies in `requirements.txt` are:
+
+- `langgraph>=0.2.0`
+- `pypdf>=6.0.0`
+- `openpyxl>=3.1.0`
+
+`pypdf` and `openpyxl` are used by local RAG document readers for PDF and Excel files.
+
+### LLM Client
+
+Code: `core/llm_client.py`
+
+- Reads `.env`
+- Uses a DeepSeek-compatible chat-completions API
+- Exposes a simple `chat(messages, temperature=...)` interface
+- Is used by routers, direct answers, ReAct nodes, compression, and memory consolidation
+
+### LangGraph
+
+Code: `core/agent.py`, `langgraph/graph.py`
+
+The agent is written in the LangGraph mental model: a state object moves through named nodes and conditional edges. The repository also contains a small local `langgraph/` compatibility implementation with `StateGraph`, `START`, and `END`, so the ReAct control flow remains easy to inspect.
+
+The ReAct graph uses these nodes:
+
+- `think`
+- `act`
+- `reflect`
+- `repair`
+- `stop`
+
+### LangChain Compatibility
+
+Code: `langchain_core/messages.py`
+
+This repo does not depend on the full LangChain stack for the main runtime. It includes a tiny local `langchain_core` message shim with `HumanMessage` and `SystemMessage` so examples and experiments can use familiar LangChain-style message objects without pulling in a larger dependency surface.
+
+### MCP
+
+Code: `core/protocols/mcp/client.py`, `core/protocols/mcp/server.py`
+
+The project uses a JSON-line MCP-style protocol to load external tools into the same `ToolRegistry` abstraction as local tools.
+
+- `MCPClientSession` starts a subprocess
+- The client sends `initialize`, `tools/list`, and `tools/call`
+- Each remote tool is wrapped as an `MCPTool`
+- Providers decide which MCP server to start
+
+Current providers:
+
+- `AmapCapabilityProvider` starts `python -m coder mcp-server amap`
+- `FreeWebProvider` starts `freeweb/dist/index.js` if built, otherwise `npx -y freeweb-mcp@latest`
+
 ## One Turn, End to End
 
 1. The CLI forwards user input to `ConversationManager.ask()`.
@@ -119,6 +182,79 @@ START -> think -> act -> reflect -> think
 - `stop`: exit safely when the step limit is reached
 
 Tool call logs are written to `examples/tool_call_log.jsonl`. ReAct traces are written to `examples/react_trace_log.jsonl`.
+
+## Tool System
+
+Code: `core/tools.py`, `core/providers/`, `core/protocols/mcp/`
+
+All tools share the same interface:
+
+- `Tool.name`
+- `Tool.description`
+- `Tool.get_parameters()`
+- `Tool.run(parameters)`
+
+`ToolRegistry` handles registration, lookup, prompt descriptions, and OpenAI-style schema export.
+
+### Local Tools
+
+Local tools are always available when the default registry is created:
+
+| Tool | Source | Purpose |
+| --- | --- | --- |
+| `Calculator` | `core/tools.py` | Safe arithmetic using Python AST parsing |
+| `Now` | `core/tools.py` | Current local date and time |
+
+The code also contains local Amap-backed tool classes (`WeatherTool`, `StaticMapTool`, `NearbySearchTool`), but the current default path loads Amap through MCP providers.
+
+### Amap MCP Tools
+
+Provider: `core/providers/amap.py`
+
+Server: `python -m coder mcp-server amap`
+
+| Tool | Purpose |
+| --- | --- |
+| `Weather` | Current weather and short forecast |
+| `Geocode` | Address to coordinate |
+| `Regeocode` | Coordinate to formatted address |
+| `StaticMap` | Static map URL |
+| `NearbySearch` | Nearby POI search |
+| `InputTips` | Keyword suggestion |
+| `Route` | Walking, driving, or transit planning |
+| `Bus` | Bus line search |
+
+Required environment:
+
+- `GAODE_API_KEY`
+- Optional endpoint overrides such as `GAODE_WEATHER_URL`, `GAODE_GEOCODE_URL`, and related Amap URLs
+
+### FreeWeb MCP Tools
+
+Provider: `core/providers/freeweb.py`
+
+Runtime:
+
+- Prefer local built submodule: `node freeweb/dist/index.js`
+- Fallback: `npx -y freeweb-mcp@latest`
+
+Common tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `web_search` | Public web search |
+| `search_and_browse` | Search then browse top hits |
+| `browse_page` | Extract readable content from a URL |
+| `smart_browse` | Browser-aware browsing for dynamic pages |
+| `deep_search` | Search across sources such as GitHub, npm, and MDN |
+| `github_search` | Search GitHub repos, code, or issues |
+| `github_repo_files` | List GitHub repository files |
+| `parallel_browse` | Browse several URLs in parallel |
+| `get_page_links` | Extract links from a page |
+| `screenshot` | Capture a page screenshot |
+| `inspect_llms_txt` | Inspect `llms.txt` guidance |
+
+The conversation layer can bias a turn toward web tools with `/net on` or `/net once`.
 
 ## Terminal Commands
 

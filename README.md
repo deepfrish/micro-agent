@@ -29,6 +29,58 @@ The app reads secrets from `.env` in the project root. `.env` is ignored and wil
 
 - [Architecture guide](./MICRO_AGENT_ARCHITECTURE.md)
 
+## Technology Stack
+
+- Python 3.10+ for the CLI, agent runtime, memory pipeline, and local tools
+- DeepSeek-compatible chat API client in `core/llm_client.py`
+- LangGraph-style state machine for ReAct execution
+- LangChain-style message compatibility shims in `langchain_core/`
+- MCP-style JSON-line tool protocol for local external tools
+- Amap Web Service APIs for weather, geocoding, static maps, POI search, routing, and bus lookup
+- FreeWeb MCP for public web search, browsing, extraction, GitHub search, parallel browsing, and screenshots
+- Local JSON stores for sessions, window memory, and global long-term memory
+- Local RAG over files in `knowledge_base/`
+- Optional Qdrant vector retrieval experiment in `core/rag.py`
+
+## Tooling
+
+micro-agent has two tool layers.
+
+Local tools are registered directly in `core/tools.py`:
+
+- `Calculator` - safe arithmetic evaluator
+- `Now` - current local date and time
+
+External tools are loaded through providers and MCP:
+
+- `AmapCapabilityProvider` starts `python -m coder mcp-server amap`
+- `FreeWebProvider` starts the local `freeweb/dist/index.js` when present, otherwise falls back to `npx -y freeweb-mcp@latest`
+
+Amap MCP tools:
+
+- `Weather`
+- `Geocode`
+- `Regeocode`
+- `StaticMap`
+- `NearbySearch`
+- `InputTips`
+- `Route`
+- `Bus`
+
+FreeWeb MCP tools include:
+
+- `web_search`
+- `search_and_browse`
+- `browse_page`
+- `smart_browse`
+- `deep_search`
+- `github_search`
+- `github_repo_files`
+- `parallel_browse`
+- `get_page_links`
+- `screenshot`
+- `inspect_llms_txt`
+
 ## Core Layout
 
 - `coder/` - CLI entry point, command parsing, background memory worker
