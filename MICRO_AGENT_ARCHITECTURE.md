@@ -1,8 +1,8 @@
-# micro-agent Architecture Guide
+# micro-agent 架构说明
 
-This document is written for future Codex runs and maintainers. It explains the project structure, turn flow, memory model, RAG logic, and terminal commands.
+这份文档面向未来的 Codex 和项目维护者，说明项目结构、agent 运行链路、记忆模型、RAG 逻辑、技术栈和终端命令。英文版保留在 [MICRO_AGENT_ARCHITECTURE.en.md](./MICRO_AGENT_ARCHITECTURE.en.md)。
 
-## High-Level View
+## 总览
 
 ```mermaid
 flowchart TD
@@ -23,48 +23,48 @@ flowchart TD
     E --> L[Global memory]
 ```
 
-## Main Entry Points
+## 主要入口
 
-- `python -m coder` starts the interactive CLI
-- `coder/cli/app.py` handles commands and exit-time memory jobs
-- `core/product/conversation/manager.py` orchestrates one user turn
-- `core/agent.py` runs the ReAct graph
-- `freeweb/` is an optional submodule for local web tooling; use `git submodule update --init --recursive` after cloning if it is absent
+- `python -m coder`：启动交互式 CLI
+- `coder/cli/app.py`：处理命令、展示提示、触发退出时记忆任务
+- `core/product/conversation/manager.py`：调度一次用户请求
+- `core/agent.py`：运行 ReAct 图
+- `freeweb/`：可选网页工具子模块；clone 后缺失时运行 `git submodule update --init --recursive`
 
-## Technology Stack
+## 技术栈
 
 ### Python Runtime
 
-Most of the project is Python:
+项目主体是 Python：
 
-- `coder/` provides the terminal application
-- `core/` provides the agent runtime, tool registry, memory stores, RAG, prompt builders, and MCP client/server code
-- `examples/` contains demos and trace scripts
+- `coder/`：终端应用层
+- `core/`：agent runtime、工具注册、记忆存储、RAG、prompt builder、MCP client/server
+- `examples/`：演示和轨迹脚本
 
-The current Python dependencies in `requirements.txt` are:
+当前 `requirements.txt` 依赖：
 
 - `langgraph>=0.2.0`
 - `pypdf>=6.0.0`
 - `openpyxl>=3.1.0`
 
-`pypdf` and `openpyxl` are used by local RAG document readers for PDF and Excel files.
+`pypdf` 和 `openpyxl` 用于本地 RAG 读取 PDF 与 Excel 文件。
 
 ### LLM Client
 
-Code: `core/llm_client.py`
+代码位置：`core/llm_client.py`
 
-- Reads `.env`
-- Uses a DeepSeek-compatible chat-completions API
-- Exposes a simple `chat(messages, temperature=...)` interface
-- Is used by routers, direct answers, ReAct nodes, compression, and memory consolidation
+- 读取 `.env`
+- 调用 DeepSeek-compatible chat-completions API
+- 暴露 `chat(messages, temperature=...)` 接口
+- 被路由、直接回答、ReAct 节点、压缩、记忆整理共同使用
 
 ### LangGraph
 
-Code: `core/agent.py`, `langgraph/graph.py`
+代码位置：`core/agent.py`、`langgraph/graph.py`
 
-The agent is written in the LangGraph mental model: a state object moves through named nodes and conditional edges. The repository also contains a small local `langgraph/` compatibility implementation with `StateGraph`, `START`, and `END`, so the ReAct control flow remains easy to inspect.
+agent 按 LangGraph 的心智模型组织：一个 state 在多个节点和条件边之间流转。仓库中也带有一个轻量 `langgraph/` 兼容实现，提供 `StateGraph`、`START`、`END`，让 ReAct 控制流可以直接阅读。
 
-The ReAct graph uses these nodes:
+ReAct 图包含这些节点：
 
 - `think`
 - `act`
@@ -72,76 +72,76 @@ The ReAct graph uses these nodes:
 - `repair`
 - `stop`
 
-### LangChain Compatibility
+### LangChain 兼容层
 
-Code: `langchain_core/messages.py`
+代码位置：`langchain_core/messages.py`
 
-This repo does not depend on the full LangChain stack for the main runtime. It includes a tiny local `langchain_core` message shim with `HumanMessage` and `SystemMessage` so examples and experiments can use familiar LangChain-style message objects without pulling in a larger dependency surface.
+主运行时不依赖完整 LangChain。项目只提供一个很小的 `langchain_core` message shim，包括 `HumanMessage` 和 `SystemMessage`，方便 examples 和实验代码使用熟悉的 LangChain-style message 对象。
 
 ### MCP
 
-Code: `core/protocols/mcp/client.py`, `core/protocols/mcp/server.py`
+代码位置：`core/protocols/mcp/client.py`、`core/protocols/mcp/server.py`
 
-The project uses a JSON-line MCP-style protocol to load external tools into the same `ToolRegistry` abstraction as local tools.
+项目使用 JSON-line MCP-style 协议，把外部工具加载进和本地工具相同的 `ToolRegistry` 抽象。
 
-- `MCPClientSession` starts a subprocess
-- The client sends `initialize`, `tools/list`, and `tools/call`
-- Each remote tool is wrapped as an `MCPTool`
-- Providers decide which MCP server to start
+- `MCPClientSession` 启动子进程
+- client 发送 `initialize`、`tools/list`、`tools/call`
+- 远端工具会包装成 `MCPTool`
+- provider 决定启动哪个 MCP server
 
-Current providers:
+当前 provider：
 
-- `AmapCapabilityProvider` starts `python -m coder mcp-server amap`
-- `FreeWebProvider` starts `freeweb/dist/index.js` if built, otherwise `npx -y freeweb-mcp@latest`
+- `AmapCapabilityProvider`：启动 `python -m coder mcp-server amap`
+- `FreeWebProvider`：优先启动 `freeweb/dist/index.js`，不存在时回退到 `npx -y freeweb-mcp@latest`
 
-## One Turn, End to End
+## 一轮请求的完整链路
 
-1. The CLI forwards user input to `ConversationManager.ask()`.
-2. The manager picks or creates a namespace.
-3. A `ReActAgent` is attached to the session and its working memory is synced.
-4. Long-term memory is searched for pinned and relevant candidates.
-5. `TurnRouter` decides whether the turn is `memory`, `direct`, or `react`.
-6. `RAGRouter` decides whether local knowledge should be injected.
-7. `ContextBuilder` assembles the final prompt bundle.
-8. Direct turns use the normal reply path; React turns use LangGraph; memory turns use a short acknowledgment style.
-9. The Q/A pair is written back to `data/chat_sessions.json`.
-10. On `/exit`, the current window is summarized and merged into `window_memory.json` and `global_memory.json`.
+1. CLI 把用户输入交给 `ConversationManager.ask()`
+2. manager 选择或创建 namespace
+3. 当前 session 绑定 `ReActAgent`，并同步工作记忆
+4. 长期记忆检索 pinned 记忆和相关候选记忆
+5. `TurnRouter` 判断本轮是 `memory`、`direct` 还是 `react`
+6. `RAGRouter` 判断是否需要注入本地知识库
+7. `ContextBuilder` 组装最终 prompt bundle
+8. `direct` 走普通回答；`react` 走 LangGraph；`memory` 走简短确认式回复
+9. 问答写回 `data/chat_sessions.json`
+10. `/exit` 时总结当前窗口，并合并进 `window_memory.json` 与 `global_memory.json`
 
-## Memory Layers
+## 记忆分层
 
-### Working Memory
+### 工作记忆
 
-Code: `core/memory.py`
+代码位置：`core/memory.py`
 
-- Holds small, short-lived facts for the current session
-- Uses `extract_key_facts()` to pull stable facts from user text
-- Exists only in memory; it is not directly persisted
-- `WorkingMemory.snapshot()` exposes the current set to the agent and prompt builder
+- 保存当前 session 内短期可用的小事实
+- 通过 `extract_key_facts()` 从用户文本抽取稳定信息
+- 只存在内存中，不直接持久化
+- `WorkingMemory.snapshot()` 把当前条目暴露给 agent 和 prompt builder
 
-### Session History
+### 会话历史
 
-Code: `data/chat_sessions.json`
+代码位置：`data/chat_sessions.json`
 
-- Stores the full conversation per namespace
-- Restores the current chat window
-- `/del` removes session history only; it does not touch long-term memory
+- 按 namespace 保存完整对话
+- 用于恢复当前聊天窗口
+- `/del` 只删除窗口历史，不删除长期记忆
 
-### Window Memory
+### 窗口记忆
 
-Code: `data/window_memory.json`
+代码位置：`data/window_memory.json`
 
-- Created when a chat window is exited
-- Stores a summary plus the cleaned memory candidates from that window
-- Preserves "what happened in this window" for later recall
+- 退出聊天窗口时生成
+- 保存窗口摘要和清洗后的记忆候选
+- 用来保留“这个窗口发生过什么”
 
-### Global Memory
+### 全局记忆
 
-Code: `data/global_memory.json`
+代码位置：`data/global_memory.json`
 
-- Shared across namespaces
-- Tracks `active`, `stale`, `archived`, and `deleted` states
-- Uses `memory_key` for slot-like records such as name, preference, and reply style
-- `pinned()` returns high-value stable facts first
+- 跨 namespace 共享
+- 跟踪 `active`、`stale`、`archived`、`deleted` 状态
+- 使用 `memory_key` 管理槽位型记录，例如姓名、偏好、回复风格
+- `pinned()` 优先返回高价值稳定事实
 
 ```mermaid
 flowchart LR
@@ -153,21 +153,21 @@ flowchart LR
     GM --> Q[rank / search / pinned]
 ```
 
-## RAG Logic
+## RAG 逻辑
 
-Code: `core/rag.py` and `core/memory_pipeline.py`
+代码位置：`core/rag.py`、`core/memory_pipeline.py`
 
-- Reads `.md`, `.txt`, `.csv`, `.tsv`, `.docx`, `.pdf`, and `.xlsx` files from `knowledge_base/`
-- Splits documents into chunks and runs lightweight lexical retrieval
-- `RAGRouter` first asks the model whether RAG is needed
-- If needed, the best chunks are inserted into the prompt as context blocks
-- `QdrantKnowledgeBase` is included for optional vector retrieval experiments
+- 从 `knowledge_base/` 读取 `.md`、`.txt`、`.csv`、`.tsv`、`.docx`、`.pdf`、`.xlsx`
+- 先切分文档 chunk，再做轻量词项检索
+- `RAGRouter` 先询问模型本轮是否需要 RAG
+- 如果需要，把最佳 chunk 作为上下文块插入 prompt
+- `QdrantKnowledgeBase` 用于可选向量检索实验
 
-## Agent Logic
+## Agent 运行逻辑
 
-Code: `core/agent.py`
+代码位置：`core/agent.py`
 
-The ReAct agent is a LangGraph:
+ReAct agent 是一个 LangGraph-style 图：
 
 ```text
 START -> think -> act -> reflect -> think
@@ -175,107 +175,107 @@ START -> think -> act -> reflect -> think
                  \-> stop -> END
 ```
 
-- `think`: call the model and parse `Action[...]` or `Finish[...]`
-- `act`: run the tool and append an Observation
-- `reflect`: ask the model whether to continue, repair, or finish
-- `repair`: ask the model to fix the output format
-- `stop`: exit safely when the step limit is reached
+- `think`：调用模型并解析 `Action[...]` 或 `Finish[...]`
+- `act`：执行工具并追加 Observation
+- `reflect`：让模型判断继续、修复还是结束
+- `repair`：要求模型修正输出格式
+- `stop`：达到步数上限时安全退出
 
-Tool call logs are written to `examples/tool_call_log.jsonl`. ReAct traces are written to `examples/react_trace_log.jsonl`.
+工具调用日志写入 `examples/tool_call_log.jsonl`，ReAct 轨迹写入 `examples/react_trace_log.jsonl`。
 
-## Tool System
+## 工具体系
 
-Code: `core/tools.py`, `core/providers/`, `core/protocols/mcp/`
+代码位置：`core/tools.py`、`core/providers/`、`core/protocols/mcp/`
 
-All tools share the same interface:
+所有工具共享同一个接口：
 
 - `Tool.name`
 - `Tool.description`
 - `Tool.get_parameters()`
 - `Tool.run(parameters)`
 
-`ToolRegistry` handles registration, lookup, prompt descriptions, and OpenAI-style schema export.
+`ToolRegistry` 负责注册、查找、生成 prompt 描述和导出 OpenAI-style schema。
 
-### Local Tools
+### 本地工具
 
-Local tools are always available when the default registry is created:
+创建默认 registry 时，本地工具始终可用：
 
-| Tool | Source | Purpose |
+| 工具 | 来源 | 用途 |
 | --- | --- | --- |
-| `Calculator` | `core/tools.py` | Safe arithmetic using Python AST parsing |
-| `Now` | `core/tools.py` | Current local date and time |
+| `Calculator` | `core/tools.py` | 基于 Python AST 的安全算术计算 |
+| `Now` | `core/tools.py` | 获取当前本地日期和时间 |
 
-The code also contains local Amap-backed tool classes (`WeatherTool`, `StaticMapTool`, `NearbySearchTool`), but the current default path loads Amap through MCP providers.
+代码里也保留了 Amap 本地工具类（`WeatherTool`、`StaticMapTool`、`NearbySearchTool`），但当前默认路径通过 MCP provider 加载 Amap。
 
-### Amap MCP Tools
+### Amap MCP 工具
 
-Provider: `core/providers/amap.py`
+Provider：`core/providers/amap.py`
 
-Server: `python -m coder mcp-server amap`
+Server：`python -m coder mcp-server amap`
 
-| Tool | Purpose |
+| 工具 | 用途 |
 | --- | --- |
-| `Weather` | Current weather and short forecast |
-| `Geocode` | Address to coordinate |
-| `Regeocode` | Coordinate to formatted address |
-| `StaticMap` | Static map URL |
-| `NearbySearch` | Nearby POI search |
-| `InputTips` | Keyword suggestion |
-| `Route` | Walking, driving, or transit planning |
-| `Bus` | Bus line search |
+| `Weather` | 当前天气和短期预报 |
+| `Geocode` | 地址转坐标 |
+| `Regeocode` | 坐标转格式化地址 |
+| `StaticMap` | 生成静态地图 URL |
+| `NearbySearch` | 周边 POI 搜索 |
+| `InputTips` | 关键词输入提示 |
+| `Route` | 步行、驾车、公交路线规划 |
+| `Bus` | 公交线路查询 |
 
-Required environment:
+需要的环境变量：
 
 - `GAODE_API_KEY`
-- Optional endpoint overrides such as `GAODE_WEATHER_URL`, `GAODE_GEOCODE_URL`, and related Amap URLs
+- 可选 endpoint 覆盖，例如 `GAODE_WEATHER_URL`、`GAODE_GEOCODE_URL` 等 Amap URL
 
-### FreeWeb MCP Tools
+### FreeWeb MCP 工具
 
-Provider: `core/providers/freeweb.py`
+Provider：`core/providers/freeweb.py`
 
-Runtime:
+运行方式：
 
-- Prefer local built submodule: `node freeweb/dist/index.js`
-- Fallback: `npx -y freeweb-mcp@latest`
+- 优先使用本地已构建子模块：`node freeweb/dist/index.js`
+- 回退方式：`npx -y freeweb-mcp@latest`
 
-Common tools:
+常用工具：
 
-| Tool | Purpose |
+| 工具 | 用途 |
 | --- | --- |
-| `web_search` | Public web search |
-| `search_and_browse` | Search then browse top hits |
-| `browse_page` | Extract readable content from a URL |
-| `smart_browse` | Browser-aware browsing for dynamic pages |
-| `deep_search` | Search across sources such as GitHub, npm, and MDN |
-| `github_search` | Search GitHub repos, code, or issues |
-| `github_repo_files` | List GitHub repository files |
-| `parallel_browse` | Browse several URLs in parallel |
-| `get_page_links` | Extract links from a page |
-| `screenshot` | Capture a page screenshot |
-| `inspect_llms_txt` | Inspect `llms.txt` guidance |
+| `web_search` | 公共网页搜索 |
+| `search_and_browse` | 搜索并浏览最佳结果 |
+| `browse_page` | 从 URL 提取可读内容 |
+| `smart_browse` | 面向动态页面的浏览 |
+| `deep_search` | 跨 GitHub、npm、MDN 等来源搜索 |
+| `github_search` | 搜索 GitHub 仓库、代码或 issue |
+| `github_repo_files` | 列出 GitHub 仓库文件 |
+| `parallel_browse` | 并行浏览多个 URL |
+| `get_page_links` | 提取页面链接 |
+| `screenshot` | 页面截图 |
+| `inspect_llms_txt` | 检查 `llms.txt` 指引 |
 
-The conversation layer can bias a turn toward web tools with `/net on` or `/net once`.
+对话层可以用 `/net on` 或 `/net once` 偏向网页工具。
 
-## Terminal Commands
+## 终端命令
 
-### Chat Commands
+### 对话命令
 
-- `/new` - mark the next turn as a new session
-- `/compress` - compress the current chat history and log the evaluation
-- `/del <namespace>` - delete a specific chat history
-- `/tools` - print tool descriptions
-- `/net on|once|off|status` - control network preference
-- `/exit` - consolidate the current window and quit
-- `/exit -n` - consolidate the current window and stay in the CLI
+- `/new`：标记下一轮为新 session
+- `/compress`：压缩当前聊天历史并记录评估
+- `/del <namespace>`：删除指定聊天历史
+- `/tools`：打印工具描述
+- `/net on|once|off|status`：控制网络偏好
+- `/exit`：整理当前窗口并退出
+- `/exit -n`：整理当前窗口并继续留在 CLI
 
-### Background Commands
+### 后台命令
 
-- `python -m coder memory-worker <job.json>` - run a memory consolidation job
-- `python -m coder mcp-server amap` - serve Amap MCP tools
-- `python -m coder mcp-server weather` - serve weather MCP tools
-- `git submodule update --init --recursive` - fetch the optional `freeweb/` web tooling submodule
+- `python -m coder memory-worker <job.json>`：执行记忆整理任务
+- `python -m coder mcp-server amap`：启动 Amap MCP 工具
+- `python -m coder mcp-server weather`：启动 Weather-only MCP 工具
+- `git submodule update --init --recursive`：拉取可选 `freeweb/` 工具子模块
 
-## Recommended Reading Order
+## 推荐阅读顺序
 
 1. `coder/cli/app.py`
 2. `core/product/conversation/manager.py`
@@ -285,9 +285,9 @@ The conversation layer can bias a turn toward web tools with `/net on` or `/net 
 6. `core/rag.py`
 7. `core/tools.py`
 
-## Current Contract
+## 当前约定
 
-- `.env` is not committed
-- `data/` stores runtime state only
-- Prefer `core/product/` for high-level imports
-- The project name is `micro-agent`
+- `.env` 不提交
+- `data/` 只保存运行时状态
+- 高层导入优先使用 `core/product/`
+- 项目名统一为 `micro-agent`

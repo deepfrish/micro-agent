@@ -1,62 +1,66 @@
 # micro-agent
 
-micro-agent is a learning-oriented chat agent skeleton. The goal is to make every turn easy to trace: routing, memory, RAG, tools, and exit-time consolidation are all explicit and documented so a future Codex can read the repo quickly.
+micro-agent 是一个用于学习和实验的对话式 agent 骨架。它把一次用户请求拆成清晰的运行链路：路由、记忆、RAG、工具调用、退出时记忆整理都能被追踪和阅读。这个仓库的目标是：未来把项目交给 Codex 时，它能快速理解项目结构和 agent 逻辑。
 
-## Quick Start
+英文版文档保留在 [README.en.md](./README.en.md)。
+
+## 快速开始
 
 ```bash
 pip install -r requirements.txt
 python -m coder
 ```
 
-The app reads secrets from `.env` in the project root. `.env` is ignored and will not be pushed.
+项目从根目录 `.env` 读取密钥和服务配置。`.env` 已被 `.gitignore` 忽略，不会上传到 GitHub。
 
-## Entry Points
+## 入口命令
 
-- `python -m coder` - interactive CLI
-- `/new` - start a new chat namespace
-- `/exit` - save the current session and quit
-- `/exit -n` - save the current session and stay in the CLI
-- `/compress` - compress the active chat window
-- `/del <namespace>` - delete one chat window history
-- `/tools` - print the current tool list
-- `/net on|once|off|status` - control network preference
-- `/your-namespace` - switch to a namespace
-- `python -m coder memory-worker <job.json>` - background memory consolidation job
-- `python -m coder mcp-server amap|weather` - local MCP tool servers
+- `python -m coder`：启动交互式 CLI
+- `/new`：新建一个聊天命名空间
+- `/exit`：保存当前会话并退出
+- `/exit -n`：保存当前会话，但继续留在 CLI
+- `/compress`：压缩当前聊天窗口历史
+- `/del <namespace>`：删除指定聊天窗口历史
+- `/tools`：打印当前可用工具列表
+- `/net on|once|off|status`：控制网页/外部工具偏好
+- `/your-namespace`：切换到某个会话命名空间
+- `python -m coder memory-worker <job.json>`：执行后台记忆整理任务
+- `python -m coder mcp-server amap|weather`：启动本地 MCP 工具服务
 
-## Documentation
+## 项目文档
 
-- [Architecture guide](./MICRO_AGENT_ARCHITECTURE.md)
+- [架构说明](./MICRO_AGENT_ARCHITECTURE.md)
+- [English README](./README.en.md)
+- [English architecture guide](./MICRO_AGENT_ARCHITECTURE.en.md)
 
-## Technology Stack
+## 技术栈
 
-- Python 3.10+ for the CLI, agent runtime, memory pipeline, and local tools
-- DeepSeek-compatible chat API client in `core/llm_client.py`
-- LangGraph-style state machine for ReAct execution
-- LangChain-style message compatibility shims in `langchain_core/`
-- MCP-style JSON-line tool protocol for local external tools
-- Amap Web Service APIs for weather, geocoding, static maps, POI search, routing, and bus lookup
-- FreeWeb MCP for public web search, browsing, extraction, GitHub search, parallel browsing, and screenshots
-- Local JSON stores for sessions, window memory, and global long-term memory
-- Local RAG over files in `knowledge_base/`
-- Optional Qdrant vector retrieval experiment in `core/rag.py`
+- Python 3.10+：CLI、agent runtime、记忆管线、本地工具
+- DeepSeek-compatible Chat API：封装在 `core/llm_client.py`
+- LangGraph-style 状态机：用于 ReAct 执行流程
+- LangChain-style message shim：`langchain_core/` 中提供轻量兼容层
+- MCP-style JSON-line 工具协议：用于加载外部工具
+- Amap Web Service APIs：天气、地理编码、静态地图、周边搜索、路线、公交
+- FreeWeb MCP：公共网页搜索、浏览、内容提取、GitHub 搜索、并行浏览、截图
+- 本地 JSON 存储：会话、窗口记忆、全局长期记忆
+- 本地 RAG：读取 `knowledge_base/` 中的资料
+- 可选 Qdrant 向量检索实验：位于 `core/rag.py`
 
-## Tooling
+## 工具体系
 
-micro-agent has two tool layers.
+micro-agent 有两层工具。
 
-Local tools are registered directly in `core/tools.py`:
+本地工具直接注册在 `core/tools.py`：
 
-- `Calculator` - safe arithmetic evaluator
-- `Now` - current local date and time
+- `Calculator`：安全算术表达式计算
+- `Now`：获取当前本地日期和时间
 
-External tools are loaded through providers and MCP:
+外部工具通过 provider 和 MCP 加载：
 
-- `AmapCapabilityProvider` starts `python -m coder mcp-server amap`
-- `FreeWebProvider` starts the local `freeweb/dist/index.js` when present, otherwise falls back to `npx -y freeweb-mcp@latest`
+- `AmapCapabilityProvider` 启动 `python -m coder mcp-server amap`
+- `FreeWebProvider` 优先启动本地 `freeweb/dist/index.js`，不存在时回退到 `npx -y freeweb-mcp@latest`
 
-Amap MCP tools:
+Amap MCP 工具：
 
 - `Weather`
 - `Geocode`
@@ -67,7 +71,7 @@ Amap MCP tools:
 - `Route`
 - `Bus`
 
-FreeWeb MCP tools include:
+FreeWeb MCP 工具：
 
 - `web_search`
 - `search_and_browse`
@@ -81,28 +85,28 @@ FreeWeb MCP tools include:
 - `screenshot`
 - `inspect_llms_txt`
 
-## Core Layout
+## 核心目录
 
-- `coder/` - CLI entry point, command parsing, background memory worker
-- `core/product/` - product-facing wrappers; read these first
-- `core/` - low-level agent, memory, RAG, tools, and MCP compatibility code
-- `freeweb/` - optional web tooling submodule used by the FreeWeb provider
-- `knowledge_base/` - local RAG corpus
-- `examples/` - demos, traces, and compression logs
+- `coder/`：CLI 入口、命令解析、后台记忆 worker
+- `core/product/`：面向产品层的封装，建议优先阅读
+- `core/`：底层 agent、记忆、RAG、工具、MCP 兼容实现
+- `freeweb/`：可选网页工具子模块，供 FreeWeb provider 使用
+- `knowledge_base/`：本地 RAG 语料
+- `examples/`：演示、调试脚本、轨迹日志
 
-If the submodule is missing after clone, run:
+如果 clone 后缺少 `freeweb/` 子模块，运行：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-## Runtime Model
+## 运行模型
 
-- Decide whether the turn is a memory update, a direct answer, or a ReAct tool turn
-- Inject working memory, long-term memory, and local RAG only when useful
-- Run the agent through LangGraph: `think -> act -> reflect -> repair/stop`
-- On exit, summarize the active window and merge it into long-term memory
+- 判断当前输入是记忆更新、直接回答，还是 ReAct 工具调用
+- 按需注入工作记忆、长期记忆和本地 RAG 资料
+- 通过 LangGraph 风格流程执行：`think -> act -> reflect -> repair/stop`
+- 退出会话时整理当前窗口，把窗口摘要合并进长期记忆
 
-## Data State
+## 数据状态
 
-The `data/` directory has been cleared. Runtime files will be recreated automatically the next time the app runs.
+仓库中的 `data/` 目录已经清空。项目运行后会自动重新生成会话、窗口记忆和全局长期记忆文件。
