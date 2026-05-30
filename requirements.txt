@@ -1,3 +1,3 @@
 langgraph>=0.2.0
-pypdf>=6.0.0
-openpyxl>=3.1.0
+markitdown[all]
+openpyxl

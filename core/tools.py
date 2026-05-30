@@ -889,16 +889,24 @@ class NearbySearchTool(Tool):
         ]
 
 
-def create_default_registry(memory_namespace: str = "default", include_external: bool = True) -> ToolRegistry:
+def create_default_registry(memory_namespace: str = "default", include_external: bool = True, include_rag: bool = True) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register_tool(CalculatorTool())
     registry.register_tool(NowTool())
+    
+    if include_rag:
+        try:
+            from .rag import RAGTool
+            registry.register_tool(RAGTool())
+        except ImportError as e:
+            print(f"Warning: Failed to import RAGTool: {e}")
+            
     if include_external:
         registry.register_default_external_tools()
     return registry
 
 
-DEFAULT_REGISTRY = create_default_registry(include_external=False)
+DEFAULT_REGISTRY = create_default_registry(include_external=False, include_rag=False)
 TOOLS: List[Tool] = DEFAULT_REGISTRY.list_tools()
 
 

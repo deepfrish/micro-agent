@@ -14,8 +14,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from uuid import NAMESPACE_URL, uuid5
-import zipfile
-import xml.etree.ElementTree as ET
+
+from .tools import Tool, ToolParameter, ParameterInput
+from .llm_client import DeepSeekClient
+from .long_term_memory import LongTermMemoryStore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +25,7 @@ LOCAL_DEPS = PROJECT_ROOT / ".venv_deps"
 if LOCAL_DEPS.exists() and str(LOCAL_DEPS) not in sys.path:
     sys.path.insert(0, str(LOCAL_DEPS))
 
-TEXT_EXTENSIONS = {".md", ".txt", ".csv", ".tsv", ".docx", ".pdf", ".xlsx"}
+TEXT_EXTENSIONS = {".md", ".txt", ".csv", ".tsv", ".docx", ".pdf", ".xlsx", ".pptx", ".html", ".json"}
 
 
 def _normalize_text(text: str) -> str:
@@ -68,109 +70,177 @@ def _read_text_file(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace")
 
 
-def _read_delimited_table(path: Path, delimiter: str) -> str:
-    rows: List[str] = []
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.reader(handle, delimiter=delimiter)
-        for row in reader:
-            values = [_normalize_text(value) for value in row]
-            if any(values):
-                rows.append(" | ".join(values))
-    return "\n".join(rows)
+_md_instance = None
+
+def _get_markitdown():
+    global _md_instance
+    if _md_instance is None:
+        try:
+            from markitdown import MarkItDown
+            _md_instance = MarkItDown()
+        except ImportError as exc:
+            raise RuntimeError("Reading documents requires markitdown. Install it with `pip install markitdown`.") from exc
+    return _md_instance
 
 
 def _read_xlsx(path: Path) -> str:
+    """Read an xlsx file directly with openpyxl, bypassing MarkItDown's
+    xlsx->HTML->BeautifulSoup pipeline which hangs on large files."""
     try:
-        from openpyxl import load_workbook
-    except Exception as exc:
-        raise RuntimeError("Reading .xlsx files requires openpyxl.") from exc
-
-    workbook = load_workbook(path, read_only=True, data_only=True)
-    blocks: List[str] = []
-    try:
-        for sheet in workbook.worksheets:
-            blocks.append(f"# Sheet: {sheet.title}")
-            for row in sheet.iter_rows(values_only=True):
-                values = ["" if value is None else _normalize_text(str(value)) for value in row]
-                if any(values):
-                    blocks.append(" | ".join(values))
-    finally:
-        workbook.close()
-    return "\n".join(blocks)
-
-
-def _read_docx(path: Path) -> str:
-    try:
-        with zipfile.ZipFile(path) as archive:
-            xml_bytes = archive.read("word/document.xml")
-    except Exception as exc:
-        raise RuntimeError(f"Could not read .docx file: {path}") from exc
-
-    root = ET.fromstring(xml_bytes)
-    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-    blocks: List[str] = []
-    for paragraph in root.findall(".//w:p", namespace):
-        texts = [node.text or "" for node in paragraph.findall(".//w:t", namespace)]
-        text = _normalize_text("".join(texts))
-        if text:
-            blocks.append(text)
-    return "\n".join(blocks)
-
-
-def _read_pdf(path: Path) -> str:
-    try:
-        from pypdf import PdfReader
-    except Exception as exc:
+        import openpyxl
+    except ImportError:
         raise RuntimeError(
-            "Reading .pdf files requires pypdf. Install it or keep using the project-local .venv_deps folder."
-        ) from exc
-
-    reader = PdfReader(str(path))
-    pages: List[str] = []
-    for index, page in enumerate(reader.pages, start=1):
-        text = page.extract_text() or ""
-        text = _clean_document_text(text)
-        if text:
-            pages.append(f"# Page {index}\n{text}")
-    return "\n\n".join(pages)
+            "Reading .xlsx files requires openpyxl. Install it with `pip install openpyxl`."
+        )
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    lines: list[str] = []
+    for sheet in wb.worksheets:
+        lines.append(f"# Sheet: {sheet.title}")
+        for row in sheet.iter_rows(values_only=True):
+            # Skip rows where every cell is empty
+            if all(cell is None or str(cell).strip() == "" for cell in row):
+                continue
+            lines.append("\t".join("" if cell is None else str(cell) for cell in row))
+    wb.close()
+    return "\n".join(lines)
 
 
 def read_document(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix in {".md", ".txt"}:
         return _read_text_file(path)
-    if suffix == ".csv":
-        return _read_delimited_table(path, ",")
-    if suffix == ".tsv":
-        return _read_delimited_table(path, "\t")
+
+    # xlsx files are read directly to avoid MarkItDown's xlsx->HTML->bs4 path,
+    # which can hang indefinitely on large files due to bs4 version conflicts.
     if suffix == ".xlsx":
-        return _read_xlsx(path)
-    if suffix == ".docx":
-        return _read_docx(path)
-    if suffix == ".pdf":
-        return _read_pdf(path)
-    raise ValueError(f"Unsupported document type: {path.suffix}")
+        try:
+            return _read_xlsx(path)
+        except Exception as exc:
+            print(f"[WARNING] openpyxl failed for {path}: {exc}")
+            return ""
+
+    md = _get_markitdown()
+    try:
+        result = md.convert(str(path))
+        if result and result.text_content:
+            return result.text_content
+        return ""
+    except Exception as exc:
+        print(f"[WARNING] MarkItDown conversion failed for {path}: {exc}")
+        return ""
 
 
-def chunk_text(text: str, chunk_size: int = 800, overlap: int = 120) -> List[str]:
+def _is_cjk(ch: str) -> bool:
+    code = ord(ch)
+    return (
+        0x4E00 <= code <= 0x9FFF or
+        0x3400 <= code <= 0x4DBF or
+        0x20000 <= code <= 0x2A6DF or
+        0x2A700 <= code <= 0x2B73F or
+        0x2B740 <= code <= 0x2B81F or
+        0x2B820 <= code <= 0x2CEAF or
+        0xF900 <= code <= 0xFAFF
+    )
+
+def _approx_token_len(text: str) -> int:
+    cjk = sum(1 for ch in text if _is_cjk(ch))
+    non_cjk_tokens = len([t for t in text.split() if t])
+    return cjk + non_cjk_tokens
+
+def _split_paragraphs_with_headings(text: str) -> List[dict[str, Any]]:
+    lines = text.splitlines()
+    heading_stack: List[str] = []
+    paragraphs: List[dict[str, Any]] = []
+    buf: List[str] = []
+    
+    def flush_buf():
+        if not buf:
+            return
+        content = "\n".join(buf).strip()
+        if not content:
+            return
+        paragraphs.append({
+            "content": content,
+            "heading_path": " > ".join(heading_stack) if heading_stack else None,
+        })
+    
+    for raw in lines:
+        if raw.strip().startswith("#"):
+            flush_buf()
+            level = len(raw) - len(raw.lstrip('#'))
+            title = raw.lstrip('#').strip()
+            
+            if level <= 0:
+                level = 1
+            if level <= len(heading_stack):
+                heading_stack = heading_stack[:level-1]
+            heading_stack.append(title)
+            continue
+        
+        if raw.strip() == "":
+            flush_buf()
+            buf = []
+        else:
+            buf.append(raw)
+    
+    flush_buf()
+    
+    if not paragraphs:
+        paragraphs = [{"content": text.strip(), "heading_path": None}]
+    
+    return paragraphs
+
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 120) -> List[dict[str, Any]]:
     cleaned = _clean_document_text(text)
     if not cleaned:
         return []
 
-    chunk_size = max(1, chunk_size)
-    overlap = max(0, min(overlap, chunk_size - 1))
-
-    chunks: List[str] = []
-    start = 0
-    length = len(cleaned)
-    while start < length:
-        end = min(length, start + chunk_size)
-        chunk = cleaned[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        if end >= length:
-            break
-        start = max(end - overlap, start + 1)
+    paragraphs = _split_paragraphs_with_headings(cleaned)
+    chunks: List[dict[str, Any]] = []
+    cur: List[dict[str, Any]] = []
+    cur_tokens = 0
+    i = 0
+    
+    while i < len(paragraphs):
+        p = paragraphs[i]
+        p_tokens = _approx_token_len(p["content"]) or 1
+        
+        if cur_tokens + p_tokens <= chunk_size or not cur:
+            cur.append(p)
+            cur_tokens += p_tokens
+            i += 1
+        else:
+            content = "\n\n".join(x["content"] for x in cur)
+            heading_path = next((x["heading_path"] for x in reversed(cur) if x.get("heading_path")), None)
+            
+            chunks.append({
+                "content": content,
+                "heading_path": heading_path,
+            })
+            
+            if overlap > 0 and cur:
+                kept: List[dict[str, Any]] = []
+                kept_tokens = 0
+                for x in reversed(cur):
+                    t = _approx_token_len(x["content"]) or 1
+                    if kept_tokens + t > overlap:
+                        break
+                    kept.append(x)
+                    kept_tokens += t
+                cur = list(reversed(kept))
+                cur_tokens = kept_tokens
+            else:
+                cur = []
+                cur_tokens = 0
+    
+    if cur:
+        content = "\n\n".join(x["content"] for x in cur)
+        heading_path = next((x["heading_path"] for x in reversed(cur) if x.get("heading_path")), None)
+        chunks.append({
+            "content": content,
+            "heading_path": heading_path,
+        })
+    
     return chunks
 
 
@@ -221,15 +291,19 @@ class KnowledgeBase:
             if not text:
                 continue
 
-            for index, chunk in enumerate(chunk_text(text, chunk_size=chunk_size, overlap=overlap), start=1):
+            for index, chunk_info in enumerate(chunk_text(text, chunk_size=chunk_size, overlap=overlap), start=1):
                 source = str(path.relative_to(root)).replace("\\", "/")
+                content = chunk_info["content"]
+                heading_path = chunk_info.get("heading_path")
+                if heading_path:
+                    content = f"[{heading_path}]\n\n{content}"
                 chunks.append(
                     KnowledgeChunk(
                         key=f"{source}::{index:03d}",
                         chunk_id=f"{index:03d}",
                         source=source,
-                        text=chunk,
-                        metadata={"path": str(path)},
+                        text=content,
+                        metadata={"path": str(path), "heading_path": heading_path},
                     )
                 )
 
@@ -293,6 +367,93 @@ class HashEmbeddingModel:
         return [value / norm for value in vector]
 
 
+class QwenEmbeddingModel:
+    """Qwen (DashScope) text embedding model."""
+
+    def __init__(self, url: str | None = None, api_key: str | None = None, model: str = "text-embedding-v3") -> None:
+        _load_dotenv()
+        self.url = (url or os.getenv("QANWEN_EMBEDDING_URL") or "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding").rstrip("/")
+        self.api_key = api_key or os.getenv("QANWEN_EMBEDDING_KEY") or os.getenv("QANWEN_API_KEY") or ""
+        self.model = model
+        self.dimensions = 1024 if "v3" in self.model else 1536
+        
+        if not self.api_key:
+            raise RuntimeError("Missing Qwen API key in .env or environment. Please set QANWEN_EMBEDDING_KEY or QANWEN_API_KEY.")
+
+    def _post_with_retry(
+        self,
+        texts: List[str],
+        text_type: str = "document",
+        *,
+        timeout: float = 90.0,
+        max_retries: int = 3,
+    ) -> List[List[float]]:
+        """POST a batch of texts to the DashScope embedding API with retry/backoff.
+        DashScope supports up to 25 texts per request.
+        Returns a list of embedding vectors in the same order as input.
+        """
+        import time
+        payload = {
+            "model": self.model,
+            "input": {"texts": texts},
+            "parameters": {"text_type": text_type},
+        }
+        data = json.dumps(payload).encode("utf-8")
+        last_exc: Exception | None = None
+        for attempt in range(max_retries):
+            if attempt > 0:
+                wait = 2 ** attempt  # 2s, 4s backoff
+                print(f"[INFO] Qwen API retry {attempt}/{max_retries - 1} after {wait}s...")
+                time.sleep(wait)
+            request = urllib.request.Request(
+                self.url,
+                data=data,
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    body = response.read().decode("utf-8")
+                res_json = json.loads(body)
+                embeddings = res_json.get("output", {}).get("embeddings", [])
+                if not embeddings:
+                    raise RuntimeError(f"Unexpected response from Qwen API: {body}")
+                # embeddings list is sorted by index field
+                embeddings.sort(key=lambda e: e.get("text_index", 0))
+                vectors = [e.get("embedding", []) for e in embeddings]
+                # Auto-detect dimension from first call
+                if vectors and len(vectors[0]) != self.dimensions:
+                    self.dimensions = len(vectors[0])
+                return vectors
+            except urllib.error.HTTPError as exc:
+                body = exc.read().decode("utf-8", errors="ignore")
+                raise RuntimeError(f"Qwen Embedding API error: {exc.code} {body}") from exc
+            except OSError as exc:
+                last_exc = exc
+        raise RuntimeError(f"Qwen network error after {max_retries} attempts: {last_exc}") from last_exc
+
+    def embed(self, text: str) -> List[float]:
+        if not text.strip():
+            return [0.0] * self.dimensions
+        return self._post_with_retry([text])[0]
+
+    def embed_batch(self, texts: List[str], batch_size: int = 10) -> List[List[float]]:
+        """Embed a list of texts efficiently using batched API calls.
+        DashScope supports up to 10 texts per request.
+        """
+        results: List[List[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            # Replace empty strings with a single space to avoid API errors
+            safe_batch = [t if t.strip() else " " for t in batch]
+            vectors = self._post_with_retry(safe_batch)
+            results.extend(vectors)
+        return results
+
+
 class QdrantVectorStore:
     def __init__(
         self,
@@ -324,7 +485,13 @@ class QdrantVectorStore:
                 "distance": "Cosine",
             }
         }
-        self._request("PUT", f"/collections/{self.collection}", payload)
+        try:
+            self._request("PUT", f"/collections/{self.collection}", payload)
+        except RuntimeError as e:
+            if "409" in str(e) or "already exists" in str(e).lower():
+                pass
+            else:
+                raise
 
     def upsert_chunks(self, chunks: Sequence[KnowledgeChunk], embeddings: Sequence[List[float]]) -> None:
         points = []
@@ -409,10 +576,24 @@ class QdrantKnowledgeBase:
     def __init__(
         self,
         vector_store: QdrantVectorStore | None = None,
-        embedding_model: HashEmbeddingModel | None = None,
+        embedding_model: Any | None = None,
+        llm_client: Any | None = None,
     ) -> None:
-        self.embedding_model = embedding_model or HashEmbeddingModel()
+        if embedding_model is None:
+            _load_dotenv()
+            api_key = os.getenv("QANWEN_EMBEDDING_KEY") or os.getenv("QANWEN_API_KEY")
+            if api_key:
+                try:
+                    embedding_model = QwenEmbeddingModel()
+                except Exception as e:
+                    print(f"Failed to initialize QwenEmbeddingModel, falling back to HashEmbeddingModel. Error: {e}")
+                    embedding_model = HashEmbeddingModel()
+            else:
+                embedding_model = HashEmbeddingModel()
+                
+        self.embedding_model = embedding_model
         self.vector_store = vector_store or QdrantVectorStore(dimensions=self.embedding_model.dimensions)
+        self.llm_client = llm_client
 
     def index(self, knowledge_base: KnowledgeBase, *, recreate: bool = False) -> int:
         if recreate:
@@ -420,16 +601,224 @@ class QdrantKnowledgeBase:
         else:
             self.vector_store.ensure_collection()
 
-        embeddings = [self.embedding_model.embed(chunk.text) for chunk in knowledge_base.chunks]
+        texts = [chunk.text for chunk in knowledge_base.chunks]
+        # Use batch embedding if available (QwenEmbeddingModel), otherwise fall back one-by-one
+        if hasattr(self.embedding_model, "embed_batch"):
+            print(f"[INFO] Embedding {len(texts)} chunks in batches...")
+            embeddings = self.embedding_model.embed_batch(texts)
+        else:
+            embeddings = [self.embedding_model.embed(t) for t in texts]
         self.vector_store.upsert_chunks(knowledge_base.chunks, embeddings)
         return len(knowledge_base.chunks)
 
-    def search(self, query: str, top_k: int = 4) -> List[SearchHit]:
-        vector = self.embedding_model.embed(query)
-        return self.vector_store.search(vector, limit=top_k)
+    def search(self, query: str, top_k: int = 4, strategy: str = "base") -> List[SearchHit]:
+        if strategy == "mqe":
+            if not getattr(self, "llm_client", None):
+                raise ValueError("MQE strategy requires an llm_client initialized in QdrantKnowledgeBase.")
+            
+            prompt = (
+                f"You are an AI assistant. Please generate 3 different but semantically similar versions "
+                f"of the following query to help with a search task. Return each on a new line. Query: {query}"
+            )
+            try:
+                response = self.llm_client.chat([{"role": "user", "content": prompt}])
+                queries = [q.strip("- \t\n") for q in response.splitlines() if q.strip()]
+                queries.append(query)
+            except Exception as e:
+                print(f"MQE LLM error: {e}")
+                queries = [query]
+            
+            all_hits = {}
+            for q in set(queries):
+                vector = self.embedding_model.embed(q)
+                hits = self.vector_store.search(vector, limit=top_k)
+                for hit in hits:
+                    if hit.chunk.chunk_id not in all_hits or all_hits[hit.chunk.chunk_id].score < hit.score:
+                        all_hits[hit.chunk.chunk_id] = hit
+            
+            merged_hits = sorted(all_hits.values(), key=lambda x: x.score, reverse=True)
+            return merged_hits[:top_k]
 
-    def format_context(self, query: str, top_k: int = 4) -> str:
-        hits = self.search(query, top_k=top_k)
+        elif strategy == "hyde":
+            if not getattr(self, "llm_client", None):
+                raise ValueError("HyDE strategy requires an llm_client initialized in QdrantKnowledgeBase.")
+            
+            prompt = (
+                f"You are a helpful expert. Please write a brief, hypothetical document or answer "
+                f"that would perfectly answer the following query: {query}"
+            )
+            try:
+                hypothetical_doc = self.llm_client.chat([{"role": "user", "content": prompt}])
+            except Exception as e:
+                print(f"HyDE LLM error: {e}")
+                hypothetical_doc = query
+                
+            vector = self.embedding_model.embed(hypothetical_doc)
+            return self.vector_store.search(vector, limit=top_k)
+
+        else:
+            vector = self.embedding_model.embed(query)
+            return self.vector_store.search(vector, limit=top_k)
+
+    def format_context(self, query: str, top_k: int = 4, strategy: str = "base") -> str:
+        hits = self.search(query, top_k=top_k, strategy=strategy)
         if not hits:
             return "No relevant context found."
         return "\n\n".join(hit.chunk.to_context_block() for hit in hits)
+
+
+class RAGTool(Tool):
+    """
+    RAGTool provides end-to-end RAG capabilities.
+    Actions supported:
+    - 'add_document': Ingests a document from file_path into the vector store.
+    - 'ask': Answers a question using the retrieved context from the vector store.
+    """
+
+    def __init__(
+        self,
+        qdrant_kb: QdrantKnowledgeBase | None = None,
+        llm_client: Any | None = None,
+        memory_store: LongTermMemoryStore | None = None,
+        namespace: str = "default",
+        source_label: str = "local tool"
+    ) -> None:
+        super().__init__(
+            name="RAGTool",
+            description="End-to-end RAG tool for document ingestion and question answering. Action can be 'add_document' or 'ask'.",
+            source_label=source_label,
+        )
+        self.llm_client = llm_client or DeepSeekClient()
+        self.qdrant_kb = qdrant_kb or QdrantKnowledgeBase(llm_client=self.llm_client)
+        self.memory_store = memory_store
+        self.namespace = namespace
+        self.default_strategy = "base"
+
+    def run(self, parameters: ParameterInput) -> str:
+        normalized = self.normalize_parameters(parameters)
+        action = normalized.get("action")
+
+        if action == "add_document":
+            file_path = str(normalized.get("file_path") or "").strip()
+            if not file_path:
+                return "Error: file_path is required for add_document."
+            return self._add_document(file_path)
+        elif action == "ask":
+            question = str(normalized.get("question") or "").strip()
+            strategy = str(normalized.get("strategy") or "base").strip()
+            if not question:
+                return "Error: question is required for ask."
+            return self._ask(question, strategy)
+        else:
+            return f"Error: Unknown action '{action}'. Supported actions are 'add_document' and 'ask'."
+
+    def _add_document(self, file_path: str) -> str:
+        path = Path(file_path)
+        if not path.exists():
+            return f"Error: File not found at {file_path}"
+        try:
+            if path.is_file():
+                text = read_document(path).strip()
+                if not text:
+                    return f"Warning: No text extracted from {file_path}"
+
+                chunks: List[KnowledgeChunk] = []
+                for index, chunk_info in enumerate(chunk_text(text), start=1):
+                    source = path.name
+                    content = chunk_info["content"]
+                    heading_path = chunk_info.get("heading_path")
+                    if heading_path:
+                        content = f"[{heading_path}]\n\n{content}"
+                    chunks.append(
+                        KnowledgeChunk(
+                            key=f"{source}::{index:03d}",
+                            chunk_id=f"{index:03d}",
+                            source=source,
+                            text=content,
+                            metadata={"path": str(path), "heading_path": heading_path},
+                        )
+                    )
+                temp_kb = KnowledgeBase(chunks)
+                num_indexed = self.qdrant_kb.index(temp_kb, recreate=False)
+                if self.memory_store:
+                    self.memory_store.add_record(self.namespace, f"Indexed document '{path.name}' into RAG knowledge base.", kind="note", action="append")
+                return f"Successfully ingested document '{path.name}'. Indexed {num_indexed} chunks."
+            elif path.is_dir():
+                temp_kb = KnowledgeBase.from_directory(path)
+                num_indexed = self.qdrant_kb.index(temp_kb, recreate=False)
+                if self.memory_store:
+                    self.memory_store.add_record(self.namespace, f"Indexed directory '{path.name}' into RAG knowledge base.", kind="note", action="append")
+                return f"Successfully ingested directory '{path.name}'. Indexed {num_indexed} chunks."
+            else:
+                return f"Error: {file_path} is neither a file nor a directory."
+        except Exception as e:
+            return f"Error ingesting document: {str(e)}"
+
+    def _ask(self, question: str, strategy: str = "base") -> str:
+        try:
+            context = self.qdrant_kb.format_context(question, top_k=5, strategy=strategy)
+            if not context or "No relevant context found" in context:
+                return "I couldn't find any relevant information in the knowledge base to answer your question."
+
+            prompt = (
+                "You are an intelligent knowledge base assistant. Answer the user's question based ONLY on the provided context.\n"
+                "If the context does not contain enough information to answer the question, state that clearly. Do not use outside knowledge.\n\n"
+                "Context:\n"
+                f"{context}\n\n"
+                "Question:\n"
+                f"{question}"
+            )
+
+            messages = [{"role": "user", "content": prompt}]
+            answer = self.llm_client.chat(messages)
+
+            if self.memory_store:
+                self.memory_store.add_record(self.namespace, f"Queried RAG for '{question}' using strategy '{strategy}'.", kind="note", action="append")
+                
+                # Extract semantic knowledge
+                extract_prompt = (
+                    "Extract the core facts or semantic knowledge points from the following answer to a user's question. "
+                    "Output a concise summary of the factual knowledge that an agent should remember for future reference. "
+                    "If the answer does not contain meaningful long-term knowledge, return nothing.\n\n"
+                    f"Question: {question}\n"
+                    f"Answer: {answer}"
+                )
+                try:
+                    knowledge = self.llm_client.chat([{"role": "user", "content": extract_prompt}]).strip()
+                    if knowledge and not knowledge.lower().startswith("nothing") and len(knowledge) > 5:
+                        self.memory_store.add_record(self.namespace, f"Learned from RAG: {knowledge}", kind="fact", action="append")
+                except Exception:
+                    pass
+
+            return answer
+        except Exception as e:
+            return f"Error during question answering: {str(e)}"
+
+    def get_parameters(self) -> Sequence[ToolParameter]:
+        return [
+            ToolParameter(
+                name="action",
+                type="string",
+                description="The action to perform: 'add_document' or 'ask'.",
+                required=True,
+            ),
+            ToolParameter(
+                name="file_path",
+                type="string",
+                description="The absolute or relative path to the document or directory (required if action is 'add_document').",
+                required=False,
+            ),
+            ToolParameter(
+                name="question",
+                type="string",
+                description="The question to ask based on the ingested documents (required if action is 'ask').",
+                required=False,
+            ),
+            ToolParameter(
+                name="strategy",
+                type="string",
+                description="Advanced retrieval strategy: 'base', 'mqe' (Multi-Query Expansion), or 'hyde' (Hypothetical Document Embeddings). Defaults to 'base'.",
+                required=False,
+                default="base"
+            ),
+        ]

@@ -36,7 +36,7 @@ python -m coder
 ## 技术栈
 
 - Python 3.10+：CLI、agent runtime、记忆管线、本地工具
-- DeepSeek-compatible Chat API：封装在 `core/llm_client.py`
+- DeepSeek-compatible Chat API：封装在 `core/llm_client.py`，并提供专属的 `MemoryLLMClient` 利用 Qwen 小模型进行极低成本的后台记忆归纳抽取
 - LangGraph-style 状态机：用于 ReAct 执行流程
 - LangChain-style message shim：`langchain_core/` 中提供轻量兼容层
 - MCP-style JSON-line 工具协议：用于加载外部工具

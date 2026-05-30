@@ -102,8 +102,20 @@ def run() -> None:
                 if session is None:
                     print("No active chat window.")
                     continue
-                agent = session.ensure_agent(manager.config, manager.client)
+                agent = session.ensure_agent(manager.config, manager.client, manager.memory_store)
                 print(agent.tool_registry.get_tools_description(include_source=True))
+                continue
+            if command.kind == "rag":
+                session = manager.active_session()
+                if session is None:
+                    print("No active chat window. Start or switch a chat first.")
+                    continue
+                strategy = command.argument.strip().lower()
+                if strategy not in ("base", "mqe", "hyde"):
+                    print("Unknown rag strategy. Use /rag=base, /rag=mqe, or /rag=hyde.")
+                    continue
+                manager.set_rag_strategy(strategy)
+                print(f"RAG strategy set to '{strategy}' for [{session.namespace}].")
                 continue
             if command.kind == "net":
                 session = manager.active_session()

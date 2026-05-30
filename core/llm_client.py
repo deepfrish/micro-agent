@@ -86,3 +86,19 @@ class DeepSeekClient:
         if value is None:
             return default
         return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+class MemoryLLMClient(DeepSeekClient):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        _load_dotenv()
+        self.api_key = api_key or os.getenv("MEMORY_LLM_API_KEY") or os.getenv("QANWEN_EMBEDDING_KEY") or os.getenv("DEEPSEEK_API_KEY", "")
+        self.base_url = (base_url or os.getenv("MEMORY_LLM_BASE_URL") or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).rstrip("/")
+        self.model = model or os.getenv("MEMORY_LLM_MODEL") or os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+        self.timeout = float(timeout if timeout is not None else os.getenv("DEEPSEEK_TIMEOUT", "120"))
+        self.use_proxy = self._env_flag("DEEPSEEK_USE_PROXY", default=False)

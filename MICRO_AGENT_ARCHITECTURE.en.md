@@ -49,10 +49,9 @@ Most of the project is Python:
 The current Python dependencies in `requirements.txt` are:
 
 - `langgraph>=0.2.0`
-- `pypdf>=6.0.0`
-- `openpyxl>=3.1.0`
+- `markitdown`
 
-`pypdf` and `openpyxl` are used by local RAG document readers for PDF and Excel files.
+`markitdown` is used by local RAG for unified multi-modal document parsing (PDF, Excel, Docx, etc.).
 
 ### LLM Client
 
@@ -61,7 +60,8 @@ Code: `core/llm_client.py`
 - Reads `.env`
 - Uses a DeepSeek-compatible chat-completions API
 - Exposes a simple `chat(messages, temperature=...)` interface
-- Is used by routers, direct answers, ReAct nodes, compression, and memory consolidation
+- Used by routers, direct answers, and ReAct nodes
+- **Includes `MemoryLLMClient`**: A specialized client designed for high-frequency and long-context tasks (like window compression `/compress` and session consolidation `/exit`). It allows configuring cost-effective small models (e.g., Qwen series) via `MEMORY_LLM_*` variables to drastically reduce token costs for background memory jobs.
 
 ### LangGraph
 
@@ -135,8 +135,9 @@ Code: `data/chat_sessions.json`
 
 Code: `data/window_memory.json`
 
-- Created when a chat window is exited
+- Created when a chat window is exited (or handled asynchronously via `memory-worker`)
 - Stores a summary plus the cleaned memory candidates from that window
+- Leverages the dedicated `MemoryLLMClient` (e.g., small Qwen models) for low-cost extraction
 - Preserves "what happened in this window" for later recall
 
 ### Global Memory

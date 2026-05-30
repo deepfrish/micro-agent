@@ -49,10 +49,9 @@ flowchart TB
 当前 `requirements.txt` 依赖：
 
 - `langgraph>=0.2.0`
-- `pypdf>=6.0.0`
-- `openpyxl>=3.1.0`
+- `markitdown`
 
-`pypdf` 和 `openpyxl` 用于本地 RAG 读取 PDF 与 Excel 文件。
+`markitdown` 用于本地 RAG 解析多种文档格式（PDF, Excel, Docx等）。
 
 ### LLM Client
 
@@ -62,6 +61,7 @@ flowchart TB
 - 调用 DeepSeek-compatible chat-completions API
 - 暴露 `chat(messages, temperature=...)` 接口
 - 被路由、直接回答、ReAct 节点、压缩、记忆整理共同使用
+- **新增 `MemoryLLMClient`**：专为高频和长文本上下文（如窗口压缩 `/compress` 和退出时的会话归纳 `/exit`）设计。允许通过 `MEMORY_LLM_*` 配置廉价小模型（如 Qwen 系列），从而大幅降低后台记忆整理任务的 Token 成本。
 
 ### LangGraph
 
@@ -135,8 +135,9 @@ ReAct 图包含这些节点：
 
 代码位置：`data/window_memory.json`
 
-- 退出聊天窗口时生成
+- 退出聊天窗口时生成（或由后台异步 `memory-worker` 进程生成）
 - 保存窗口摘要和清洗后的记忆候选
+- 利用专用的 `MemoryLLMClient`（如 Qwen 小模型）进行低成本抽取
 - 用来保留“这个窗口发生过什么”
 
 ### 全局记忆

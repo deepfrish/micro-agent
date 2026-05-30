@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Mapping
 from .agent import ReActAgent
 from .context_builder import ContextBuilder
 from .framework import AgentConfig
-from .llm_client import DeepSeekClient
+from .llm_client import DeepSeekClient, MemoryLLMClient
 from .long_term_memory import LongTermMemoryStore
 from .compression import WindowCompressor
 from .memory_pipeline import ExitMemoryConsolidator, GlobalMemoryRouter, RAGRouter, TurnRouter
@@ -75,14 +75,22 @@ class ConversationSession:
     compression_state: Dict[str, Any] = field(default_factory=dict)
     skill_state: Dict[str, Any] = field(default_factory=dict)
     network_mode: str = "off"
+    rag_strategy: str = "base"
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
     agent: ReActAgent | None = field(default=None, repr=False, compare=False)
 
-    def ensure_agent(self, base_config: AgentConfig, client: DeepSeekClient) -> ReActAgent:
+    def ensure_agent(self, base_config: AgentConfig, client: DeepSeekClient, memory_store: Any | None = None) -> ReActAgent:
         if self.agent is None:
             config = replace(base_config, memory_namespace=self.namespace)
             self.agent = ReActAgent(client=client, config=config)
+            try:
+                rag_tool = self.agent.tool_registry.find_tool("RAGTool")
+                rag_tool.default_strategy = getattr(self, "rag_strategy", "base")
+                rag_tool.memory_store = memory_store
+                rag_tool.namespace = self.namespace
+            except KeyError:
+                pass
             for message in self.history:
                 if message.get("role") == "user":
                     self.agent.working_memory.add(message.get("content", ""))
@@ -95,6 +103,7 @@ class ConversationSession:
             "compression_state": self.compression_state,
             "skill_state": self.skill_state,
             "network_mode": self.network_mode,
+            "rag_strategy": self.rag_strategy,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -145,6 +154,7 @@ class ConversationStore:
                 compression_state=dict(entry.get("compression_state") or {}) if isinstance(entry.get("compression_state"), Mapping) else {},
                 skill_state=dict(entry.get("skill_state") or {}) if isinstance(entry.get("skill_state"), Mapping) else {},
                 network_mode=self._normalize_network_mode(str(entry.get("network_mode") or "off")),
+                rag_strategy=str(entry.get("rag_strategy") or "base"),
                 created_at=str(entry.get("created_at") or _now_iso()),
                 updated_at=str(entry.get("updated_at") or _now_iso()),
             )
@@ -193,10 +203,11 @@ class ConversationManager:
         self.skill_router = skill_router or SkillRouter(self.skill_registry, self.client)
         self.task_planner = task_planner or TaskPlanner(self.client)
         self.task_synthesizer = task_synthesizer or TaskSynthesizer(self.client)
-        self.window_compressor = window_compressor or WindowCompressor(self.client)
+        self.memory_client = MemoryLLMClient(timeout=self.config.timeout)
+        self.window_compressor = window_compressor or WindowCompressor(self.memory_client)
         self.context_builder = ContextBuilder()
         self.memory_consolidator = memory_consolidator or ExitMemoryConsolidator(
-            self.client,
+            self.memory_client,
             global_store=self.memory_store,
         )
         self.sessions = self.session_store.load()
@@ -231,6 +242,24 @@ class ConversationManager:
         normalized = self._normalize_network_mode(mode)
         session.network_mode = normalized
         session.updated_at = _now_iso()
+        self.session_store.save(self.sessions)
+        return normalized
+
+    def set_rag_strategy(self, strategy: str) -> str:
+        session = self.active_session()
+        if session is None:
+            raise ValueError("No active chat window.")
+        normalized = strategy.strip().lower()
+        if normalized not in ("base", "mqe", "hyde"):
+            normalized = "base"
+        session.rag_strategy = normalized
+        session.updated_at = _now_iso()
+        if session.agent:
+            try:
+                rag_tool = session.agent.tool_registry.find_tool("RAGTool")
+                rag_tool.default_strategy = normalized
+            except KeyError:
+                pass
         self.session_store.save(self.sessions)
         return normalized
 
@@ -355,7 +384,7 @@ class ConversationManager:
                 session = ConversationSession(namespace=self.active_namespace)
                 self.sessions[self.active_namespace] = session
 
-        agent = session.ensure_agent(self.config, self.client)
+        agent = session.ensure_agent(self.config, self.client, self.memory_store)
         agent.reset_turn_metadata()
         agent.working_memory.add(question)
         skill_resolution = self.skill_router.resolve(question, session.history)

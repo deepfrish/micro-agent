@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
-from core.llm_client import DeepSeekClient
+from core.llm_client import DeepSeekClient, MemoryLLMClient
 from core.memory_pipeline import ExitMemoryConsolidator
 
 
@@ -35,7 +35,7 @@ def _load_job(path: Path) -> Dict[str, Any]:
 
 
 def _process_job(job: Dict[str, Any]) -> Dict[str, Any]:
-    client = DeepSeekClient()
+    client = MemoryLLMClient()
     consolidator = ExitMemoryConsolidator(client)
     return consolidator.consolidate_job(job)
 

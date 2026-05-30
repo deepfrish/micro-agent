@@ -32,7 +32,7 @@ The app reads secrets from `.env` in the project root. `.env` is ignored and wil
 ## Technology Stack
 
 - Python 3.10+ for the CLI, agent runtime, memory pipeline, and local tools
-- DeepSeek-compatible chat API client in `core/llm_client.py`
+- DeepSeek-compatible chat API client in `core/llm_client.py`, with a dedicated `MemoryLLMClient` using cost-effective Qwen models for background memory consolidation
 - LangGraph-style state machine for ReAct execution
 - LangChain-style message compatibility shims in `langchain_core/`
 - MCP-style JSON-line tool protocol for local external tools
