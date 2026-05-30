@@ -49,7 +49,8 @@ flowchart TB
 当前 `requirements.txt` 依赖：
 
 - `langgraph>=0.2.0`
-- `markitdown`
+- `markitdown[all]`
+- `openpyxl`
 
 `markitdown` 用于本地 RAG 解析多种文档格式（PDF, Excel, Docx等）。
 
@@ -367,10 +368,15 @@ skills/
 
 ```text
 scripts/
-└── skill_smoke_test.py
+├── clear_qdrant.py
+├── index_kb.py
+├── skill_smoke_test.py
+├── test_freeweb_agent.py
+└── test_ragtool.py
 ```
 
 - 离线验证显性和隐性 skill 触发是否生效
+- 知识库索引与测试脚本
 
 ### `examples/`
 
@@ -381,6 +387,8 @@ examples/
 ├── memory_playground.py
 ├── qdrant_rag_demo.py
 ├── rag_demo.py
+├── test_qwen_embedding.py
+├── three_step_qa.py
 ├── trace_run.py
 ├── trace_three_step_qa.py
 └── working_memory_demo.py
@@ -392,10 +400,10 @@ examples/
 
 ```text
 knowledge_base/
-├── chapter8_learning_path.md
-├── project_notes.md
-├── rag_basics.md
-└── rag_table_notes.csv
+├── XX有限公司公司管理制度守则（完整版）.docx
+├── rag_table_notes.csv
+├── 虚拟SaaS平台技术文档（完整版）.pdf
+└── 通用企业全场景FAQ知识库_豆包AI生成.xlsx
 ```
 
 - 本地 RAG 语料
