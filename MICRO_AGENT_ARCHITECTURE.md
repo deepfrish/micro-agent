@@ -462,6 +462,10 @@ data/
 - `/compress`：压缩当前聊天历史并记录评估
 - `/del <namespace>`：删除指定聊天历史
 - `/tools`：打印工具描述
+- `/rag <strategy>`：设置 RAG 检索策略。可选模式包括：
+  - `base`：直接使用用户原始提问进行基础检索
+  - `mqe` (Multi-Query Expansion)：多查询扩展，由 LLM 将原问题改写成多个不同视角的查询，再合并检索结果
+  - `hyde` (Hypothetical Document Embeddings)：假设性文档嵌入，由 LLM 针对问题先“假想”生成一段回答，利用这段假想回答去向量库中进行更相关的语义匹配
 - `/net on|once|off|status`：控制网络偏好
 - `/exit`：整理当前窗口并退出
 - `/exit -n`：整理当前窗口并继续留在 CLI

@@ -462,6 +462,10 @@ data/
 - `/compress` - compress the current chat history and log the evaluation
 - `/del <namespace>` - delete a specific chat history
 - `/tools` - print tool descriptions
+- `/rag <strategy>` - set RAG retrieval strategy. Available modes:
+  - `base`: direct retrieval using the original user query
+  - `mqe` (Multi-Query Expansion): the LLM rewrites the query from multiple perspectives to broaden the search, then results are merged
+  - `hyde` (Hypothetical Document Embeddings): the LLM generates a "fake" hypothetical answer, which is then used to retrieve semantically closer documents
 - `/net on|once|off|status` - control network preference
 - `/exit` - consolidate the current window and quit
 - `/exit -n` - consolidate the current window and stay in the CLI

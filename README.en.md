@@ -20,6 +20,7 @@ The app reads secrets from `.env` in the project root. `.env` is ignored and wil
 - `/compress` - compress the active chat window
 - `/del <namespace>` - delete one chat window history
 - `/tools` - print the current tool list
+- `/rag <strategy>` - switch the RAG retrieval strategy (supports three modes: `base` basic retrieval, `mqe` multi-query expansion, `hyde` hypothetical document embeddings)
 - `/net on|once|off|status` - control network preference
 - `/your-namespace` - switch to a namespace
 - `python -m coder memory-worker <job.json>` - background memory consolidation job

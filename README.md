@@ -22,6 +22,7 @@ python -m coder
 - `/compress`：压缩当前聊天窗口历史
 - `/del <namespace>`：删除指定聊天窗口历史
 - `/tools`：打印当前可用工具列表
+- `/rag <strategy>`：切换当前会话的 RAG 检索策略（支持三种模式：`base` 基础检索、`mqe` 多查询扩展、`hyde` 假设性文档嵌入）
 - `/net on|once|off|status`：控制网页/外部工具偏好
 - `/your-namespace`：切换到某个会话命名空间
 - `python -m coder memory-worker <job.json>`：执行后台记忆整理任务
