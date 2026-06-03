@@ -44,8 +44,12 @@ def test_amap_agent():
 def test_fs_agent():
     print("\n=== Testing Agent with Filesystem MCP ===")
     registry = ToolRegistry()
+    import os
+    workspace_dir = os.path.abspath(os.path.join(ROOT, "data", "workspace"))
+    os.makedirs(workspace_dir, exist_ok=True)
+    
     cmd = "npx.cmd" if sys.platform == "win32" else "npx"
-    fs_tools = load_mcp_tools(MCPServerConfig(command=[cmd, "-y", "@modelcontextprotocol/server-filesystem", "D:\\AgentWorkspace"]), provider_name="fs")
+    fs_tools = load_mcp_tools(MCPServerConfig(command=[cmd, "-y", "@modelcontextprotocol/server-filesystem", workspace_dir]), provider_name="fs")
     
     if not fs_tools:
         print("❌ Failed to load Filesystem tools.")
@@ -54,7 +58,7 @@ def test_fs_agent():
     agent = ReActAgent()
     agent.tool_registry.register_tools(fs_tools)
     
-    question = "请在 D:\\AgentWorkspace 下列出当前的文件，并告诉我有没有名叫 mcp.json 的文件。"
+    question = f"请在 {workspace_dir} 下列出当前的文件，并告诉我有没有名叫 mcp.json 的文件。"
     print(f"Question to agent: {question}")
     
     try:
