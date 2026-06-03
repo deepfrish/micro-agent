@@ -5,9 +5,17 @@ micro-agent is a learning-oriented chat agent skeleton. The goal is to make ever
 ## Quick Start
 
 ```bash
+git clone https://github.com/deepfrish/micro-agent.git
+cd micro-agent
 pip install -r requirements.txt
-python -m src.coder
 ```
+
+#### MCP Client Environment Initialization (Recommended)
+If you want to seamlessly use the complete MCP search and filesystem functionalities in your local Cursor or Claude Desktop, you can run:
+```bash
+python scripts/setup_mcp_config.py
+```
+This will automatically generate a localized `mcp.json` (gitignored) tailored to your absolute paths and create a safe sandbox workspace at `data/workspace/`.
 
 The app reads secrets from `.env` in the project root. `.env` is ignored and will not be pushed.
 

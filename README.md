@@ -7,11 +7,19 @@ micro-agent 是一个用于学习和实验的对话式 agent 骨架。它把一�
 ## 快速开始
 
 ```bash
+git clone https://github.com/deepfrish/micro-agent.git
+cd micro-agent
 pip install -r requirements.txt
-python -m src.coder
 ```
 
 项目从根目录 `.env` 读取密钥和服务配置。`.env` 已被 `.gitignore` 忽略，不会上传到 GitHub。
+
+#### MCP 客户端环境初始化（推荐）
+如果你需要在本机的 Cursor 或 Claude Desktop 等客户端中无缝体验完整的 MCP 搜索与文件系统功能，可以运行以下命令：
+```bash
+python scripts/setup_mcp_config.py
+```
+这将在项目根目录下生成一个专属于你本机绝对路径的 `mcp.json`（已被忽略提交），并创建一个安全的沙盒环境 `data/workspace/` 供 MCP 使用。
 
 ## 入口命令
 
