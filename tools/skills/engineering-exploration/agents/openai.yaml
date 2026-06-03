@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engineering Exploration"
+  short_description: "Explore engineering plans before coding"
+  default_prompt: "Use $engineering-exploration to explore this engineering idea, compare approaches, and prepare a plan before writing code."

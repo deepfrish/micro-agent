@@ -1,0 +1,3 @@
+[submodule "freeweb"]
+	path = mcp_servers/freeweb
+	url = https://github.com/xenitV1/freeweb.git

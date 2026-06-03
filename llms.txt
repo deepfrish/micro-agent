@@ -1,0 +1,24 @@
+# Micro-Agent Project
+
+Micro-Agent is an AI agent system implementing ReAct logic, memory extraction, RAG, and Tool/MCP usage.
+
+## Directory Structure
+- `src/` - Application logic.
+  - `src/core/` - Agent logic, prompts, memory management (Long-term, Short-term, RAG).
+  - `src/coder/` - CLI interface.
+  - `src/langchain_core/` & `src/langgraph/` - Mock wrappers.
+- `tools/` - Callable actions by the AI.
+  - `tools/mcp_servers/` - Model Context Protocol servers.
+  - `tools/skills/` - Isolated agent skills.
+- `data/` - Static files, e.g., knowledge bases.
+- `docs/` - Architectural markdown docs.
+- `tests/` - Python tests for logic verification.
+- `scripts/` - Utilities for database and system state operations.
+
+## Key Files
+- `src/core/agent.py` - Core ReAct loop.
+- `src/core/memory.py` & `src/core/rag.py` - Memory & retrieval algorithms.
+- `tests/test_everything_agent.py` - Entry point for testing MCP loading.
+
+## Instructions
+For full guidelines on interacting with this codebase, see `AGENTS.md`.
