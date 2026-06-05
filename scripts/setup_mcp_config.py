@@ -18,7 +18,7 @@ def main():
     print(f"✅ 成功确保工作区存在: {workspace_dir}")
     
     # 2. 生成适合当前本机的 mcp.json
-    mcp_json_path = ROOT / "mcp.json"
+    mcp_json_path = ROOT / "tools" / "mcp_servers" / "mcp.json"
     cmd = "npx.cmd" if sys.platform == "win32" else "npx"
     
     mcp_config = {

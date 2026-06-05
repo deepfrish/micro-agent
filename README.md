@@ -19,7 +19,7 @@ pip install -r requirements.txt
 ```bash
 python scripts/setup_mcp_config.py
 ```
-这将在项目根目录下生成一个专属于你本机绝对路径的 `mcp.json`（已被忽略提交），并创建一个安全的沙盒环境 `data/workspace/` 供 MCP 使用。
+这将在 `tools/mcp_servers/` 目录下生成一个专属于你本机绝对路径的 `mcp.json`（已被忽略提交），并创建一个安全的沙盒环境 `data/workspace/` 供 MCP 使用。
 
 ## 入口命令
 

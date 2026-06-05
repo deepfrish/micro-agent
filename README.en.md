@@ -15,7 +15,7 @@ If you want to seamlessly use the complete MCP search and filesystem functionali
 ```bash
 python scripts/setup_mcp_config.py
 ```
-This will automatically generate a localized `mcp.json` (gitignored) tailored to your absolute paths and create a safe sandbox workspace at `data/workspace/`.
+This will automatically generate a localized `mcp.json` (gitignored) in `tools/mcp_servers/` tailored to your absolute paths and create a safe sandbox workspace at `data/workspace/`.
 
 The app reads secrets from `.env` in the project root. `.env` is ignored and will not be pushed.
 
