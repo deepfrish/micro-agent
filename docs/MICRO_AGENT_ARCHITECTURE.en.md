@@ -94,6 +94,7 @@ The project uses a JSON-line MCP-style protocol to load external tools into the 
 - The client sends `initialize`, `tools/list`, and `tools/call`
 - Each remote tool is wrapped as an `MCPTool`
 - Providers decide which MCP server to start
+- New: Dynamically parses `tools/mcp_servers/mcp.json` to load any standard MCP Servers (e.g. filesystem, everything search, etc.).
 
 Current providers:
 
@@ -105,11 +106,12 @@ Current providers:
 1. The CLI forwards user input to `ConversationManager.ask()`.
 2. The manager picks or creates a namespace.
 3. A `ReActAgent` is attached to the session and its working memory is synced.
-4. Long-term memory is searched for pinned and relevant candidates.
-5. `TurnRouter` decides whether the turn is `memory`, `direct`, or `react`.
-6. `RAGRouter` decides whether local knowledge should be injected.
-7. `ContextBuilder` assembles the final prompt bundle.
-8. Direct turns use the normal reply path; React turns use LangGraph; memory turns use a short acknowledgment style.
+4. Context extraction is triggered via skills like `universal-location-and-transit-assistant` to amend potentially vague location/status information.
+5. Long-term memory is searched for pinned and relevant candidates.
+6. `TurnRouter` decides whether the turn is `memory`, `direct`, or `react` (all local file operations are explicitly routed to react mode).
+7. `RAGRouter` decides whether local knowledge should be injected.
+8. `ContextBuilder` assembles the final prompt bundle.
+9. Direct turns use the normal reply path; React turns use LangGraph tool calls; memory turns use a short acknowledgment style.
 9. The Q/A pair is written back to `data/chat_sessions.json`.
 10. On `/exit`, the current window is summarized and merged into `window_memory.json` and `global_memory.json`.
 
@@ -393,16 +395,25 @@ tests/
 
 ```text
 examples/
-├── debug_freeweb_mcp.py
-├── main.py
-├── memory_playground.py
-├── qdrant_rag_demo.py
-├── rag_demo.py
-├── test_qwen_embedding.py
-├── three_step_qa.py
-├── trace_run.py
-├── trace_three_step_qa.py
-└── working_memory_demo.py
+├── logs/
+│   ├── react_trace_log.jsonl
+│   ├── route_log.jsonl
+│   └── tool_call_log.jsonl
+├── mcp/
+│   └── debug_freeweb_mcp.py
+├── memory/
+│   ├── memory_playground.py
+│   └── working_memory_demo.py
+├── rag/
+│   ├── generate_rag_dataset.py
+│   ├── qdrant_rag_demo.py
+│   ├── rag_demo.py
+│   ├── rag_evaluator.py
+│   └── test_qwen_embedding.py
+└── tracing/
+    ├── three_step_qa.py
+    ├── trace_run.py
+    └── trace_three_step_qa.py
 ```
 
 - Demos, debug scripts, and trace samples
