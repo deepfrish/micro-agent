@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "micro-agent"
+version = "0.1.0"
+description = "A conversational agent skeleton"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.2.0",
+    "markitdown[all]",
+    "openpyxl",
+    "rich>=13.0.0",
+    "prompt_toolkit>=3.0.0",
+    "click>=8.0.0"
+]
+
+[project.scripts]
+micro-agent = "src.coder.__main__:main"

@@ -1,0 +1,2 @@
+[console_scripts]
+micro-agent = src.coder.__main__:main

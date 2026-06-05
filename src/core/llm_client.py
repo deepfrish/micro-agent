@@ -5,8 +5,7 @@ import os
 from pathlib import Path
 import urllib.error
 import urllib.request
-from typing import Dict, List
-
+from typing import Any, Dict, List
 
 def _load_dotenv() -> None:
     env_path = Path(__file__).resolve().parents[2] / ".env"
@@ -39,15 +38,23 @@ class DeepSeekClient:
         self.timeout = float(timeout if timeout is not None else os.getenv("DEEPSEEK_TIMEOUT", "120"))
         self.use_proxy = self._env_flag("DEEPSEEK_USE_PROXY", default=False)
 
-    def chat(self, messages: List[Dict[str, str]], temperature: float = 0.2) -> str:
+    def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.2,
+        tools: List[Dict[str, Any]] | None = None,
+    ) -> Any:
         if not self.api_key:
             raise RuntimeError("Missing DEEPSEEK_API_KEY. Put it in your .env file or environment.")
 
-        payload = {
+        payload: Dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
         }
+        if tools:
+            payload["tools"] = tools
+
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
@@ -73,7 +80,10 @@ class DeepSeekClient:
         except OSError as exc:
             raise RuntimeError(f"DeepSeek network error: {exc}") from exc
 
-        return data["choices"][0]["message"]["content"]
+        msg = data["choices"][0]["message"]
+        if tools is not None:
+            return msg
+        return msg.get("content") or ""
 
     def _build_opener(self) -> urllib.request.OpenerDirector:
         if self.use_proxy:

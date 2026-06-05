@@ -1,0 +1,6 @@
+langgraph>=0.2.0
+markitdown[all]
+openpyxl
+rich>=13.0.0
+prompt_toolkit>=3.0.0
+click>=8.0.0

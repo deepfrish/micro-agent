@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Literal, Tuple, TypedDict
+from typing import Any, Dict, List, Literal, Tuple, TypedDict
 
 from src.langgraph.graph import END, START, StateGraph
 
@@ -15,20 +14,18 @@ from .prompts import REFLECT_PROMPT, SYSTEM_PROMPT
 from .tools import ToolRegistry, create_default_registry
 
 
-ACTION_RE = re.compile(r"Action:\s*([A-Za-z_][\w]*)\[(.*?)\]\s*$", re.DOTALL)
-FINISH_RE = re.compile(r"Finish\[(.*?)\]\s*$", re.DOTALL)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL_CALL_LOG = PROJECT_ROOT / "examples" / "tool_call_log.jsonl"
 REACT_TRACE_LOG = PROJECT_ROOT / "examples" / "react_trace_log.jsonl"
 
 
 class AgentState(TypedDict):
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, Any]]
     question: str
     working_memory: List[str]
     steps: int
     final_answer: str | None
-    next_action: Tuple[str, str] | None
+    next_action: List[Tuple[str, str, str]] | None
     last_action: Tuple[str, str] | None
     observation: str
     reflection: str
@@ -60,7 +57,7 @@ class ReActAgent(Agent):
     def build_initial_state(
         self,
         question: str,
-        history_messages: List[Dict[str, str]] | None = None,
+        history_messages: List[Dict[str, Any]] | None = None,
     ) -> AgentState:
         self.working_memory.add(question)
         history = list(history_messages or [])
@@ -90,7 +87,7 @@ class ReActAgent(Agent):
     def run(
         self,
         question: str,
-        history_messages: List[Dict[str, str]] | None = None,
+        history_messages: List[Dict[str, Any]] | None = None,
         *,
         reset_tool_trace: bool = True,
     ) -> str:
@@ -134,51 +131,76 @@ class ReActAgent(Agent):
         return graph.compile()
 
     def _think_node(self, state: AgentState) -> AgentState:
-        reply = self.chat(
+        tools_schema = self.tool_registry.to_openai_schema()
+        reply_msg = self.chat(
             self._messages_with_working_memory(state),
             temperature=self.config.temperature,
-        ).strip()
-        final_answer = self._parse_finish(reply)
-        next_action = None if final_answer is not None else self._parse_action(reply)
+            tools=tools_schema
+        )
+        content = str(reply_msg.get("content") or "").strip()
+        tool_calls = reply_msg.get("tool_calls")
+        
+        final_answer = None
+        next_action = None
+        
+        if tool_calls and isinstance(tool_calls, list) and len(tool_calls) > 0:
+            next_action = []
+            for call in tool_calls:
+                call_id = call.get("id", "")
+                func = call.get("function", {})
+                tool_name = func.get("name", "")
+                tool_input = func.get("arguments", "")
+                next_action.append((tool_name, tool_input, call_id))
+        else:
+            final_answer = content
+
         self._write_react_trace_log(
             {
                 "stage": "think",
                 "namespace": self.config.memory_namespace,
                 "question": state["question"],
                 "step": state["steps"] + 1,
-                "parsed_action": list(next_action) if next_action else None,
+                "parsed_action": [list(a) for a in next_action] if next_action else None,
                 "parsed_finish": bool(final_answer),
-                "reply_preview": reply[:1200],
+                "reply_preview": content[:1200] if content else "Tool Call",
             }
         )
 
         return {
             **state,
-            "messages": state["messages"] + [{"role": "assistant", "content": reply}],
+            "messages": state["messages"] + [reply_msg],
             "steps": state["steps"] + 1,
             "final_answer": final_answer,
             "next_action": next_action,
-            "last_action": state["last_action"],
+            "last_action": (next_action[-1][0], next_action[-1][1]) if next_action else state["last_action"],
             "observation": state["observation"],
             "reflection": state["reflection"],
             "reflect_decision": state["reflect_decision"],
         }
 
     def _act_node(self, state: AgentState) -> AgentState:
-        if state["next_action"] is None:
+        if not state["next_action"]:
             return state
 
-        tool_name, tool_input = state["next_action"]
-        observation = self._execute_tool(tool_name, tool_input)
+        tool_msgs = []
+        observations = []
+        for tool_name, tool_input, tool_call_id in state["next_action"]:
+            obs = self._execute_tool(tool_name, tool_input)
+            observations.append(f"[{tool_name}]: {obs}")
+            tool_msgs.append({
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "name": tool_name,
+                "content": obs,
+            })
+        
+        combined_obs = "\n\n".join(observations)
+        
         return {
             **state,
-            "messages": state["messages"]
-            + [
-                {"role": "assistant", "content": f"Action: {tool_name}[{tool_input}]"},
-                {"role": "user", "content": f"Observation: {observation}"},
-            ],
-            "observation": observation,
-            "last_action": (tool_name, tool_input),
+            "messages": state["messages"] + tool_msgs,
+            "observation": combined_obs,
+            "last_action": (state["next_action"][-1][0], state["next_action"][-1][1]),
             "next_action": None,
         }
 
@@ -194,9 +216,9 @@ class ReActAgent(Agent):
         error_count = 0
         for msg in reversed(state["messages"]):
             content = str(msg.get("content", ""))
-            if msg["role"] == "user" and content.startswith("Observation: Tool error:"):
+            if msg["role"] == "tool" and content.startswith("Tool error:"):
                 error_count += 1
-            elif msg["role"] == "user" and content.startswith("Observation:"):
+            elif msg["role"] == "tool":
                 break
         
         if error_count >= 3:
@@ -270,8 +292,7 @@ class ReActAgent(Agent):
             + [
                 {
                     "role": "user",
-                    "content": "Your last message did not match the required format. "
-                    "Use Thought + Action, or Finish[...].",
+                    "content": "Your last action failed or was invalid. Please reconsider and try again.",
                 }
             ],
             "next_action": None,
@@ -289,7 +310,7 @@ class ReActAgent(Agent):
             return "end"
         if state["steps"] >= self.config.max_steps:
             return "stop"
-        if state["next_action"] is None:
+        if not state["next_action"]:
             return "repair"
         return "act"
 
@@ -302,18 +323,6 @@ class ReActAgent(Agent):
             return "stop"
         return "think"
 
-    def _parse_action(self, text: str) -> Tuple[str, str] | None:
-        match = ACTION_RE.search(text)
-        if not match:
-            return None
-        return match.group(1), match.group(2).strip()
-
-    def _parse_finish(self, text: str) -> str | None:
-        match = FINISH_RE.search(text)
-        if not match:
-            return None
-        return match.group(1).strip()
-
     def _parse_json_text(self, text: str) -> Dict[str, str]:
         try:
             data = json.loads(text)
@@ -325,7 +334,7 @@ class ReActAgent(Agent):
         lines = [line.strip() for line in observation.splitlines() if line.strip()]
         return lines[0] if lines else "No final answer available."
 
-    def _messages_with_working_memory(self, state: AgentState) -> List[Dict[str, str]]:
+    def _messages_with_working_memory(self, state: AgentState) -> List[Dict[str, Any]]:
         messages = list(state["messages"])
         if len(messages) < 2:
             return messages

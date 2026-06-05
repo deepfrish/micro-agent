@@ -15,29 +15,46 @@ if str(ROOT) not in sys.path:
 from src.core.product.conversation import ConversationManager
 
 from .commands import parse_chat_command
+from .repl import REPLSession
+from .display import print_markdown, print_system, print_error, print_info, print_panel, show_spinner
 
 
 def run() -> None:
     manager = ConversationManager()
-    print("micro-agent CLI ready.")
-    print(
-        "Commands: /new start a new chat, /net enable web mode, /net once web mode for next turn, /net off disable it, /compress compress the current chat window, /tools show current tool sources, /del <namespace> delete chat history, /exit quit, /exit -n leave the current chat, /<namespace> switch chats."
+    repl = REPLSession()
+
+    print_system("micro-agent CLI ready.")
+    help_text = (
+        "可用命令：\n"
+        "  /new               - 开始新的聊天\n"
+        "  /net [on|once|off] - 控制网页模式\n"
+        "  /rag <strategy>    - 切换RAG检索策略\n"
+        "  /compress          - 压缩当前聊天窗口历史\n"
+        "  /history           - 显示当前聊天的历史记录\n"
+        "  /tools             - 显示当前可用工具列表\n"
+        "  /del <namespace>   - 删除指定的聊天历史\n"
+        "  /exit              - 保存会话并退出\n"
+        "  /exit -n           - 保存并离开当前会话\n"
+        "  /<namespace>       - 切换到指定的聊天会话"
     )
+    print_panel(help_text, title="Help")
+
     known = manager.known_namespaces()
     if known:
-        print("Known namespaces: " + ", ".join(known))
+        print_info("Known namespaces: " + ", ".join(known))
     else:
-        print("Known namespaces: none yet.")
+        print_info("Known namespaces: none yet.")
 
     while True:
         active = manager.active_namespace
-        prompt = f"[{active}]> " if active else "> "
-        question = input(prompt).strip()
+        question = repl.prompt(active)
+        
         if not question:
             continue
+            
         if question.lower() in {"exit", "quit", "q"}:
             _save_active_window_memory(manager)
-            print("Bye.")
+            print_system("Bye.")
             break
 
         if question.startswith("/"):
@@ -46,120 +63,136 @@ def run() -> None:
                 continue
             if command.kind == "new":
                 manager.start_new_conversation()
-                print("Ready for a new chat. Ask the first question and I will name the namespace automatically.")
+                print_info("Ready for a new chat. Ask the first question and I will name the namespace automatically.")
                 continue
             if command.kind == "exit":
                 if command.argument and command.argument != "-n":
-                    print("Unknown /exit option. Use /exit to quit or /exit -n to leave the current chat window.")
+                    print_error("Unknown /exit option. Use /exit to quit or /exit -n to leave the current chat window.")
                     continue
                 _save_active_window_memory(manager)
                 if command.argument == "-n":
-                    print("Left the current chat window.")
+                    print_info("Left the current chat window.")
                     known = manager.known_namespaces()
-                    print("Known namespaces: " + ", ".join(known) if known else "Known namespaces: none yet.")
+                    print_info("Known namespaces: " + ", ".join(known) if known else "Known namespaces: none yet.")
                     continue
-                print("Bye.")
+                print_system("Bye.")
                 break
             if command.kind == "delete":
                 target = command.argument or active
                 if not target:
-                    print("No active chat to delete.")
+                    print_error("No active chat to delete.")
                     continue
                 try:
                     session = manager.delete_session(target)
                 except Exception as exc:
-                    print(f"Cannot delete: {exc}")
+                    print_error(f"Cannot delete: {exc}")
                     continue
-                print(f"Deleted chat [{session.namespace}]. Long-term memory was kept.")
+                print_info(f"Deleted chat [{session.namespace}]. Long-term memory was kept.")
                 continue
             if command.kind == "compress":
                 if manager.active_session() is None:
-                    print("No active chat window to compress.")
+                    print_error("No active chat window to compress.")
                     continue
-                result = manager.compress_current_window()
+                with show_spinner("Compressing memory..."):
+                    result = manager.compress_current_window()
                 if not result.get("ok"):
-                    print(f"Compression failed: {result.get('error', 'unknown error')}")
+                    print_error(f"Compression failed: {result.get('error', 'unknown error')}")
                     continue
                 if result.get("skipped"):
-                    print(
-                        "Compression skipped: "
-                        f"{result.get('reason', 'window not ready')}"
-                    )
+                    print_info(f"Compression skipped: {result.get('reason', 'window not ready')}")
                     continue
                 scores = result.get("scores") or {}
-                print(
-                    "Compressed current window: "
-                    f"{result.get('original_message_count', 0)} -> {result.get('compressed_message_count', 0)} messages, "
-                    f"recall={result.get('recall_rate', 0):.3f}, "
-                    f"scores="
-                    f"C{scores.get('coverage', 0)}/F{scores.get('fidelity', 0)}/"
-                    f"Co{scores.get('conciseness', 0)}/Ct{scores.get('continuity', 0)}, "
-                    f"log={result.get('log_path', 'examples/compress_log.jsonl')}"
+                print_info(
+                    f"Compressed: {result.get('original_message_count', 0)} -> {result.get('compressed_message_count', 0)} messages, "
+                    f"recall={result.get('recall_rate', 0):.3f}"
                 )
+                continue
+            if command.kind == "history":
+                session = manager.active_session()
+                if session is None:
+                    print_error("No active chat window.")
+                    continue
+                if not session.history:
+                    print_info("No history in this chat.")
+                    continue
+                for msg in session.history:
+                    role = str(msg.get("role", "unknown"))
+                    content = str(msg.get("content") or "").strip()
+                    if not content and role == "assistant" and msg.get("tool_calls"):
+                        calls = [f"{c.get('function', {}).get('name')}" for c in msg["tool_calls"]]
+                        content = f"[Tool Calls: {', '.join(calls)}]"
+                    if not content and role == "tool":
+                        content = "[Tool output hidden for brevity]"
+                    if not content:
+                        continue
+                    print_panel(content, title=role.capitalize())
                 continue
             if command.kind == "tools":
                 session = manager.active_session()
                 if session is None:
-                    print("No active chat window.")
+                    print_error("No active chat window.")
                     continue
                 agent = session.ensure_agent(manager.config, manager.client, manager.memory_store)
-                print(agent.tool_registry.get_tools_description(include_source=True))
+                print_markdown(agent.tool_registry.get_tools_description(include_source=True))
                 continue
             if command.kind == "rag":
                 session = manager.active_session()
                 if session is None:
-                    print("No active chat window. Start or switch a chat first.")
+                    print_error("No active chat window. Start or switch a chat first.")
                     continue
                 strategy = command.argument.strip().lower()
                 if strategy not in ("base", "mqe", "hyde"):
-                    print("Unknown rag strategy. Use /rag=base, /rag=mqe, or /rag=hyde.")
+                    print_error("Unknown rag strategy. Use /rag=base, /rag=mqe, or /rag=hyde.")
                     continue
                 manager.set_rag_strategy(strategy)
-                print(f"RAG strategy set to '{strategy}' for [{session.namespace}].")
+                print_info(f"RAG strategy set to '{strategy}' for [{session.namespace}].")
                 continue
             if command.kind == "net":
                 session = manager.active_session()
                 if session is None:
-                    print("No active chat window. Start or switch a chat first.")
+                    print_error("No active chat window. Start or switch a chat first.")
                     continue
                 argument = (command.argument or "on").strip().lower()
                 if argument in {"", "on", "enable", "enabled"}:
                     mode = manager.set_network_mode("on")
-                    print(f"Network mode for [{session.namespace}]: {mode}. Future turns will prefer ReAct + freeweb.")
+                    print_info(f"Network mode for [{session.namespace}]: {mode}. Future turns will prefer ReAct + freeweb.")
                     continue
                 if argument in {"once", "1"}:
                     mode = manager.set_network_mode("once")
-                    print(f"Network mode for [{session.namespace}]: {mode}. The next turn will prefer ReAct + freeweb.")
+                    print_info(f"Network mode for [{session.namespace}]: {mode}. The next turn will prefer ReAct + freeweb.")
                     continue
                 if argument in {"off", "disable", "disabled"}:
                     mode = manager.set_network_mode("off")
-                    print(f"Network mode for [{session.namespace}]: {mode}.")
+                    print_info(f"Network mode for [{session.namespace}]: {mode}.")
                     continue
                 if argument in {"status", "state"}:
-                    print(f"Network mode for [{session.namespace}]: {manager.get_network_mode()}.")
+                    print_info(f"Network mode for [{session.namespace}]: {manager.get_network_mode()}.")
                     continue
-                print("Unknown /net option. Use /net, /net once, /net off, or /net status.")
+                print_error("Unknown /net option.")
                 continue
 
             try:
                 session = manager.switch(command.argument)
             except Exception as exc:
-                print(f"Cannot switch: {exc}")
+                print_error(f"Cannot switch: {exc}")
                 continue
 
-            print(f"Switched to [{session.namespace}].")
+            print_info(f"Switched to [{session.namespace}].")
+            if session.history:
+                print_panel("History restored.", title=session.namespace)
             continue
 
         try:
-            session, answer, created_new = manager.ask(question)
+            with show_spinner("Agent is thinking..."):
+                session, answer, created_new = manager.ask(question)
         except Exception as exc:
-            print(f"Error: {exc}")
+            print_error(f"{exc}")
             continue
 
         if created_new:
-            print(f"Created new chat [{session.namespace}] from the first question.")
-        print(f"\n[{session.namespace}] Final answer:")
-        print(answer)
+            print_info(f"Created new chat [{session.namespace}] from the first question.")
+        
+        print_markdown(answer)
         print()
 
 
@@ -177,10 +210,10 @@ def _save_active_window_memory(manager: ConversationManager) -> None:
     try:
         _spawn_memory_worker(job_path)
     except Exception as exc:
-        print(f"Failed to queue memory consolidation: {exc}")
+        print_error(f"Failed to queue memory consolidation: {exc}")
         return
 
-    print(f"Queued window memory consolidation in background: {job_path.name}")
+    print_info(f"Queued window memory consolidation in background: {job_path.name}")
 
 
 def _write_memory_job(job: dict) -> Path:

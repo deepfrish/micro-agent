@@ -407,7 +407,9 @@ class ContextBuilder:
         if not cleaned or cleaned == "No relevant context found.":
             return ""
         return self._truncate_text(
-            "Relevant knowledge-base context. Use it when it helps answer the user, and do not invent facts beyond it:\n"
+            "Relevant knowledge-base context. You MUST strictly adhere to the information provided here. "
+            "If the context contains specific numbers, dates, or policies, use them exactly as written "
+            "and DO NOT override them with your pre-trained knowledge or general laws:\n"
             + cleaned,
             self.config.max_rag_chars,
         )

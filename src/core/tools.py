@@ -248,7 +248,40 @@ class ToolRegistry:
         return True
 
     def register_default_mcp_tools(self) -> bool:
-        return self.register_default_external_tools()
+        success = self.register_default_external_tools()
+        
+        mcp_config_path = PROJECT_ROOT / "tools" / "mcp_servers" / "mcp.json"
+        if mcp_config_path.exists():
+            try:
+                import sys
+                from .protocols.mcp.client import MCPServerConfig, load_mcp_tools
+                
+                with open(mcp_config_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                
+                servers = config_data.get("mcpServers", {})
+                for server_name, server_info in servers.items():
+                    command = [server_info.get("command")] + server_info.get("args", [])
+                    if sys.platform == "win32" and command[0] == "npx":
+                        command[0] = "npx.cmd"
+                        
+                    mcp_config = MCPServerConfig(
+                        command=command,
+                        cwd=str(PROJECT_ROOT),
+                        env=server_info.get("env")
+                    )
+                    try:
+                        tools = load_mcp_tools(mcp_config, provider_name=server_name)
+                        print(f"Loaded {server_name}: {len(tools)} tools", flush=True)
+                        if tools:
+                            self.register_tools(tools)
+                            success = True
+                    except Exception as e:
+                        print(f"Error loading {server_name}: {e}", flush=True)
+            except Exception as e:
+                print(f"Failed to load mcp.json: {e}", flush=True)
+                
+        return success
 
     def get_tools_description(self, include_source: bool = False) -> str:
         if not self._tools:
@@ -902,7 +935,7 @@ def create_default_registry(memory_namespace: str = "default", include_external:
             print(f"Warning: Failed to import RAGTool: {e}")
             
     if include_external:
-        registry.register_default_external_tools()
+        registry.register_default_mcp_tools()
     return registry
 
 

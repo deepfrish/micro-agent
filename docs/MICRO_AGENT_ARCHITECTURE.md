@@ -94,6 +94,7 @@ ReAct 图包含这些节点：
 - client 发送 `initialize`、`tools/list`、`tools/call`
 - 远端工具会包装成 `MCPTool`
 - provider 决定启动哪个 MCP server
+- 新增：支持直接解析 `tools/mcp_servers/mcp.json` 动态加载任意标准 MCP Server（例如文件系统、Everything 搜索等）。
 
 当前 provider：
 
@@ -105,11 +106,12 @@ ReAct 图包含这些节点：
 1. CLI 把用户输入交给 `ConversationManager.ask()`
 2. manager 选择或创建 namespace
 3. 当前 session 绑定 `ReActAgent`，并同步工作记忆
-4. 长期记忆检索 pinned 记忆和相关候选记忆
-5. `TurnRouter` 判断本轮是 `memory`、`direct` 还是 `react`
-6. `RAGRouter` 判断是否需要注入本地知识库
-7. `ContextBuilder` 组装最终 prompt bundle
-8. `direct` 走普通回答；`react` 走 LangGraph；`memory` 走简短确认式回复
+4. 通过 `universal-location-and-transit-assistant` 等 Skill 触发上下文抽取机制，补充并纠正用户可能遗漏的位置或状态信息
+5. 长期记忆检索 pinned 记忆和相关候选记忆
+6. `TurnRouter` 结合意图与正则表达式判断本轮是 `memory`、`direct` 还是 `react`（文件读写等本地操作均路由至 react 模式）
+7. `RAGRouter` 判断是否需要注入本地知识库
+8. `ContextBuilder` 组装最终 prompt bundle
+9. `direct` 走普通回答；`react` 走 LangGraph 调用工具；`memory` 走简短确认式回复
 9. 问答写回 `data/chat_sessions.json`
 10. `/exit` 时总结当前窗口，并合并进 `window_memory.json` 与 `global_memory.json`
 

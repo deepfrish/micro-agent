@@ -1,0 +1,92 @@
+[
+  {
+    "question": "公司的管理制度守则适用于哪些人员？",
+    "ground_truth": "适用于全体在职员工，包含管理层、正式员工、试用期员工、实习生、外包驻场人员及所有参与公司工作事务的相关人员。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "如果新员工入职时提供了虚假的学历证明，公司会如何处理？",
+    "ground_truth": "公司有权无条件解除劳动关系。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "如果员工主动提出离职，需要提前多长时间提交书面申请？",
+    "ground_truth": "试用期员工需提前3日，正式员工需提前30日提交书面离职申请。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "我昨天忘记打卡了，想申请补卡。请问每月最多可以补卡几次？如果超过规定次数会怎么处理？",
+    "ground_truth": "员工每日仅限1次补卡机会，每月补卡不得超过3次；超次数补卡无效，将按迟到或旷工处理。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "公司关于员工差旅费报销有哪些规定？",
+    "ground_truth": "员工因公差旅费可按公司标准报销，需提供真实、合法、有效的票据，填写报销单据并附佐证材料，经层级审批和财务审核通过后方可报销。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "如果员工不小心泄露了公司的机密信息，会面临什么处分？",
+    "ground_truth": "根据规定，员工违反保密规定造成信息泄露的，公司将根据情节轻重予以罚款、降职、开除处分，并依法追究经济赔偿责任及法律责任。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "员工个人办公账号应该怎样管理？",
+    "ground_truth": "员工个人办公账号、密码、系统权限需要妥善保管，严禁转借他人使用，并定期更换密码。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "根据公司管理制度，哪些行为会被视为严重违纪并可能导致无条件开除？",
+    "ground_truth": "连续旷工、重大工作失误造成公司大额损失、泄露核心机密、私自挪用公司财物、酒后上岗滋事、造谣传谣扰乱团队秩序、多次违纪屡教不改等。",
+    "source": "XX有限公司公司管理制度守则（完整版）.docx"
+  },
+  {
+    "question": "在虚拟SaaS平台技术文档中，术语“QPS”的定义是什么？",
+    "ground_truth": "QPS（每秒请求数）是衡量平台接口并发承载能力的核心指标。",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "虚拟SaaS平台在核心业务目标中，系统可用性需要保障到什么水平？",
+    "ground_truth": "99.9%以上可用性",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "How does the platform ensure data isolation among different tenants?",
+    "ground_truth": "All business data carries a tenant ID dimension identifier, and all data operations (query, insert, update, delete) enforce tenant dimension validation to prevent cross-tenant access.",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "租户到期后系统会如何自动处理？",
+    "ground_truth": "支持到期提醒、到期自动停用、续费自动恢复服务，全程自动化处理。",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "What types of business events can be pushed to third-party systems via Webhooks?",
+    "ground_truth": "Business addition, modification, and deletion events.",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "生产环境中数据库的高可用是如何实现的？",
+    "ground_truth": "采用主从架构，主库负责读写，从库负责读分流，支持故障主从切换。",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "I'm integrating with your API. If there's a network timeout or service jitter, will the interface automatically retry, and what is the retry policy?",
+    "ground_truth": "Yes, for network timeout and service jitter exceptions, the interface supports automatic retry with a maximum of 3 retries at 1-second intervals.",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "What are the log retention periods for production and audit logs according to our internal policies?",
+    "ground_truth": "Production logs are retained for 90 days, while audit logs are permanently retained.",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "当系统版本更新后出现功能异常，应该如何处理？",
+    "ground_truth": "可通过一键回滚机制回滚至上一稳定版本，回滚过程自动化、无数据丢失，回滚后快速校验业务可用性。",
+    "source": "虚拟SaaS平台技术文档（完整版）.pdf"
+  },
+  {
+    "question": "这份企业FAQ知识库的完整名称是什么？",
+    "ground_truth": "通用企业全场景FAQ知识库（完整版）",
+    "source": "通用企业全场景FAQ知识库_豆包AI生成.xlsx"
+  }
+]

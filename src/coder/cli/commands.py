@@ -1,13 +1,36 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, List, Set
 
 
 @dataclass(frozen=True, slots=True)
 class ChatCommand:
-    kind: Literal["new", "exit", "delete", "compress", "tools", "net", "switch", "rag", "noop"]
+    kind: Literal["new", "exit", "delete", "compress", "tools", "net", "switch", "rag", "history", "noop"]
     argument: str = ""
+
+
+# Dynamic registry for UI autocomplete
+_REGISTERED_COMMANDS: Set[str] = {
+    "/new",
+    "/exit",
+    "/del",
+    "/compress",
+    "/tools",
+    "/net",
+    "/rag",
+    "/history"
+}
+
+
+def register_command(command: str) -> None:
+    """Register a command for autocomplete."""
+    _REGISTERED_COMMANDS.add(command)
+
+
+def get_registered_commands() -> List[str]:
+    """Get all registered slash commands."""
+    return sorted(list(_REGISTERED_COMMANDS))
 
 
 def parse_chat_command(raw: str) -> ChatCommand:
@@ -33,6 +56,8 @@ def parse_chat_command(raw: str) -> ChatCommand:
         return ChatCommand("tools", argument)
     if keyword == "net":
         return ChatCommand("net", argument)
+    if keyword in {"history", "hist"}:
+        return ChatCommand("history", argument)
     if keyword == "rag":
         return ChatCommand("rag", argument)
     if keyword.startswith("rag="):

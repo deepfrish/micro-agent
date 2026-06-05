@@ -196,7 +196,7 @@ class TaskPlanner:
 
     @staticmethod
     def _split_question(question: str) -> List[str]:
-        raw_parts = re.split(r"[，,；;。]\s*|(?:然后|以及|并且|顺便|同时|还有)", question)
+        raw_parts = re.split(r"[；;。]\s*|(?:然后|并且|顺便|还有)", question)
         parts = [part.strip() for part in raw_parts if part and part.strip()]
         return parts or [question.strip()]
 
@@ -207,7 +207,7 @@ class TaskPlanner:
             return "memory"
         if any(
             token in lowered
-            for token in ("天气", "附近", "周边", "商场", "酒店", "地图", "路线", "公交", "计算", "日期", "时间", "查查", "美食", "餐", "店", "推荐", "吃点")
+            for token in ("天气", "附近", "周边", "商场", "酒店", "地图", "路线", "公交", "计算", "日期", "时间", "查查", "美食", "餐", "店", "推荐", "吃点", "文件", "创建", "写", "读", "目录")
         ):
             return "react"
         return "direct"
