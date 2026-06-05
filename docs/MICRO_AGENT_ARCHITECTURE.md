@@ -289,16 +289,21 @@ Provider：`src/core/tools.py` 内部的 `register_default_mcp_tools()`
 
 ```text
 src/coder/
+├── __init__.py
 ├── __main__.py
 └── cli/
     ├── __init__.py
     ├── app.py
     ├── commands.py
-    └── memory_worker.py
+    ├── display.py
+    ├── memory_worker.py
+    └── repl.py
 ```
 
 - CLI 入口、命令解析、后台记忆 worker
 - `src/coder/cli/app.py` 是交互式入口
+- `display.py` 负责终端输出格式化与颜色渲染
+- `repl.py` 实现交互式 REPL 循环
 
 ### `src/core/`
 
@@ -375,13 +380,16 @@ tools/skills/
 │       ├── engineering-design-dimensions.md
 │       ├── exploration-boundaries.md
 │       └── platform-portability.md
-└── engineering-exploration-skill/
-    ├── README.md
-    └── engineering-exploration.zip
+├── engineering-exploration-skill/
+│   ├── README.md
+│   └── engineering-exploration.zip
+└── universal-location-and-transit-assistant/
+    └── SKILL.md
 ```
 
 - `skills/engineering-exploration/` 是 runtime 实际加载的 skill
 - `skills/engineering-exploration-skill/` 保留下载来源包，便于追溯
+- `skills/universal-location-and-transit-assistant/` 位置与交通出行助手 skill，用于上下文抽取补充位置信息
 
 ### `scripts/`
 
@@ -389,11 +397,13 @@ tools/skills/
 scripts/
 ├── clear_qdrant.py
 ├── index_kb.py
+├── setup_mcp_config.py
 └── skill_smoke_test.py
 ```
 
 - 离线验证显性和隐性 skill 触发是否生效
 - 知识库索引脚本
+- MCP 环境配置生成脚本（生成 `tools/mcp_servers/mcp.json` 和沙盒工作区 `data/workspace/`）
 
 ### `tests/`
 
@@ -412,6 +422,10 @@ tests/
 
 ```text
 examples/
+├── main.py
+├── react_trace_log.jsonl
+├── route_log.jsonl
+├── tool_call_log.jsonl
 ├── logs/
 │   ├── react_trace_log.jsonl
 │   ├── route_log.jsonl
@@ -426,6 +440,7 @@ examples/
 │   ├── qdrant_rag_demo.py
 │   ├── rag_demo.py
 │   ├── rag_evaluator.py
+│   ├── rag_test_dataset.json
 │   └── test_qwen_embedding.py
 └── tracing/
     ├── three_step_qa.py
@@ -434,6 +449,7 @@ examples/
 ```
 
 - 演示、调试脚本和轨迹日志样例
+- 根级日志文件为早期运行产物，新日志写入 `logs/` 子目录
 
 ### `data/knowledge_base/`
 
@@ -488,10 +504,17 @@ src/langgraph/
 
 ```text
 data/
-└── (runtime generated)
+├── chat_sessions.json
+├── global_memory.json
+├── window_memory.json
+├── knowledge_base/
+├── memory_jobs/
+└── workspace/
 ```
 
 - 运行时生成的会话、窗口记忆和全局记忆
+- `memory_jobs/` 存放后台记忆整理任务的 job 文件
+- `workspace/` 由 `setup_mcp_config.py` 创建的 Agent 安全沙盒工作区
 
 ## 终端命令
 

@@ -47,7 +47,9 @@ python -m src.coder
 
 ## Documentation
 
-- [Architecture guide](./MICRO_AGENT_ARCHITECTURE.md)
+- [Architecture guide](./docs/MICRO_AGENT_ARCHITECTURE.md)
+- [Chinese README](./README.md)
+- [English architecture guide](./docs/MICRO_AGENT_ARCHITECTURE.en.md)
 
 ## Technology Stack
 
@@ -71,10 +73,11 @@ Local tools are registered directly in `src/core/tools.py`:
 - `Calculator` - safe arithmetic evaluator
 - `Now` - current local date and time
 
-External tools are loaded through providers and MCP:
+External tools are loaded through providers and unified MCP configuration (`tools/mcp_servers/mcp.json`):
 
 - `AmapCapabilityProvider` starts `python -m src.coder mcp-server amap`
 - `FreeWebProvider` starts the local `tools/mcp_servers/freeweb/dist/index.js` when present, otherwise falls back to `npx -y freeweb-mcp@latest`
+- Dynamically parses and loads standard MCP tools from `mcp.json` (e.g., `@modelcontextprotocol/server-filesystem` for full file create, read, and write capabilities).
 
 Amap MCP tools:
 
@@ -121,9 +124,11 @@ micro-agent/
 ├── tests/
 └── tools/
     ├── mcp_servers/
-    │   └── freeweb/
+    │   ├── freeweb/
+    │   └── mcp.json
     └── skills/
-        └── engineering-exploration/
+        ├── engineering-exploration/
+        └── universal-location-and-transit-assistant/
 ```
 
 - `src/coder/` - CLI entry point, command parsing, and background memory worker

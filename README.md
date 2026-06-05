@@ -49,9 +49,9 @@ python -m src.coder
 
 ## 项目文档
 
-- [架构说明](./MICRO_AGENT_ARCHITECTURE.md)
+- [架构说明](./docs/MICRO_AGENT_ARCHITECTURE.md)
 - [English README](./README.en.md)
-- [English architecture guide](./MICRO_AGENT_ARCHITECTURE.en.md)
+- [English architecture guide](./docs/MICRO_AGENT_ARCHITECTURE.en.md)
 
 ## 技术栈
 

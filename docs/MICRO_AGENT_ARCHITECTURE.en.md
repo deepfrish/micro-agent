@@ -288,16 +288,21 @@ Commonly supported tool categories (specific capabilities depend on your `mcp.js
 
 ```text
 src/coder/
+├── __init__.py
 ├── __main__.py
 └── cli/
     ├── __init__.py
     ├── app.py
     ├── commands.py
-    └── memory_worker.py
+    ├── display.py
+    ├── memory_worker.py
+    └── repl.py
 ```
 
 - CLI entry point, command parsing, and background memory worker
 - `src/coder/cli/app.py` is the interactive entry
+- `display.py` handles terminal output formatting and color rendering
+- `repl.py` implements the interactive REPL loop
 
 ### `src/core/`
 
@@ -374,13 +379,16 @@ tools/skills/
 │       ├── engineering-design-dimensions.md
 │       ├── exploration-boundaries.md
 │       └── platform-portability.md
-└── engineering-exploration-skill/
-    ├── README.md
-    └── engineering-exploration.zip
+├── engineering-exploration-skill/
+│   ├── README.md
+│   └── engineering-exploration.zip
+└── universal-location-and-transit-assistant/
+    └── SKILL.md
 ```
 
 - `skills/engineering-exploration/` is the skill runtime actually loads
 - `skills/engineering-exploration-skill/` keeps the downloaded source bundle for traceability
+- `skills/universal-location-and-transit-assistant/` is the location and transit assistant skill used for context extraction to amend location information
 
 ### `scripts/`
 
@@ -388,11 +396,13 @@ tools/skills/
 scripts/
 ├── clear_qdrant.py
 ├── index_kb.py
+├── setup_mcp_config.py
 └── skill_smoke_test.py
 ```
 
 - Offline validation for explicit and implicit skill activation
 - KB indexing scripts
+- MCP environment configuration generator (creates `tools/mcp_servers/mcp.json` and sandbox workspace `data/workspace/`)
 
 ### `tests/`
 
@@ -411,6 +421,10 @@ tests/
 
 ```text
 examples/
+├── main.py
+├── react_trace_log.jsonl
+├── route_log.jsonl
+├── tool_call_log.jsonl
 ├── logs/
 │   ├── react_trace_log.jsonl
 │   ├── route_log.jsonl
@@ -425,6 +439,7 @@ examples/
 │   ├── qdrant_rag_demo.py
 │   ├── rag_demo.py
 │   ├── rag_evaluator.py
+│   ├── rag_test_dataset.json
 │   └── test_qwen_embedding.py
 └── tracing/
     ├── three_step_qa.py
@@ -433,6 +448,7 @@ examples/
 ```
 
 - Demos, debug scripts, and trace samples
+- Root-level log files are legacy artifacts; new logs are written to the `logs/` subdirectory
 
 ### `data/knowledge_base/`
 
@@ -487,10 +503,17 @@ src/langgraph/
 
 ```text
 data/
-└── (runtime generated)
+├── chat_sessions.json
+├── global_memory.json
+├── window_memory.json
+├── knowledge_base/
+├── memory_jobs/
+└── workspace/
 ```
 
 - Runtime session, window memory, and global memory state
+- `memory_jobs/` stores background memory consolidation job files
+- `workspace/` is the Agent sandbox workspace created by `setup_mcp_config.py`
 
 ## Terminal Commands
 
