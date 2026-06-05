@@ -191,7 +191,7 @@ START -> think -> act -> reflect -> think
 - `repair`: ask the model to fix the output format
 - `stop`: exit safely when the step limit is reached
 
-Tool call logs are written to `examples/tool_call_log.jsonl`. ReAct traces are written to `examples/react_trace_log.jsonl`.
+Tool call logs are written to `examples/logs/tool_call_log.jsonl`. ReAct traces are written to `examples/logs/react_trace_log.jsonl`.
 
 ## Tool System
 

@@ -1,6 +1,6 @@
 # micro-agent
 
-micro-agent is a learning-oriented chat agent skeleton. The goal is to make every turn easy to trace: routing, memory, RAG, tools, and exit-time consolidation are all explicit and documented so a future Codex can read the repo quickly.
+micro-agent is a learning-oriented chat agent skeleton. The goal is to make every turn easy to trace: routing, memory, RAG, tools, and exit-time consolidation are all explicit and documented so a future AI coding assistant can read the repo quickly.
 
 ## Quick Start
 

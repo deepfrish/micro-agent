@@ -191,7 +191,7 @@ START -> think -> act -> reflect -> think
 - `repair`：要求模型修正输出格式
 - `stop`：达到步数上限时安全退出
 
-工具调用日志写入 `examples/tool_call_log.jsonl`，ReAct 轨迹写入 `examples/react_trace_log.jsonl`。
+工具调用日志写入 `examples/logs/tool_call_log.jsonl`，ReAct 轨迹写入 `examples/logs/react_trace_log.jsonl`。
 
 ## 工具体系
 
@@ -395,16 +395,25 @@ tests/
 
 ```text
 examples/
-├── debug_freeweb_mcp.py
-├── main.py
-├── memory_playground.py
-├── qdrant_rag_demo.py
-├── rag_demo.py
-├── test_qwen_embedding.py
-├── three_step_qa.py
-├── trace_run.py
-├── trace_three_step_qa.py
-└── working_memory_demo.py
+├── logs/
+│   ├── react_trace_log.jsonl
+│   ├── route_log.jsonl
+│   └── tool_call_log.jsonl
+├── mcp/
+│   └── debug_freeweb_mcp.py
+├── memory/
+│   ├── memory_playground.py
+│   └── working_memory_demo.py
+├── rag/
+│   ├── generate_rag_dataset.py
+│   ├── qdrant_rag_demo.py
+│   ├── rag_demo.py
+│   ├── rag_evaluator.py
+│   └── test_qwen_embedding.py
+└── tracing/
+    ├── three_step_qa.py
+    ├── trace_run.py
+    └── trace_three_step_qa.py
 ```
 
 - 演示、调试脚本和轨迹日志样例
