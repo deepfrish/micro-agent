@@ -100,6 +100,7 @@ ReAct 图包含这些节点：
 
 - `AmapCapabilityProvider`：启动 `python -m src.coder mcp-server amap`
 - `FreeWebProvider`：优先启动 `tools/mcp_servers/freeweb/dist/index.js`，不存在时回退到 `npx -y freeweb-mcp@latest`
+- **动态 MCP Provider**：基于 `tools/mcp_servers/mcp.json`，自动拉起任何兼容标准协议的外部服务器（如 `filesystem`, `everything`, `git` 等）。
 
 ## 一轮请求的完整链路
 
@@ -265,6 +266,22 @@ Provider：`src/core/providers/freeweb.py`
 | `inspect_llms_txt` | 检查 `llms.txt` 指引 |
 
 对话层可以用 `/net on` 或 `/net once` 偏向网页工具。
+
+### 动态加载 MCP 工具
+
+Provider：`src/core/tools.py` 内部的 `register_default_mcp_tools()`
+
+运行方式：
+
+- 通过读取 `tools/mcp_servers/mcp.json` 中配置的命令参数，自动拉起外部进程。
+
+常用支持的工具分类（具体能力由你的 `mcp.json` 决定）：
+
+| 工具类别 | 依赖 Server | 用途 |
+| --- | --- | --- |
+| **Filesystem** | `@modelcontextprotocol/server-filesystem` | 赋予 Agent `read_file`, `write_file`, `edit_file`, `create_directory`, `search_files` 等强大的本地沙盒文件系统控制权限 |
+| **Everything** | `everything-mcp` | 赋予 Agent `everything_search`, `everything_open` 接口，提供基于 Windows Everything 的全局极速文件搜索能力 |
+| **Git** | `@modelcontextprotocol/server-git` | 赋予 Agent `git_status`, `git_commit`, `git_log` 等接口，提供直接对当前代码仓库进行版本管理的能力 |
 
 ## 模块目录
 

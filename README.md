@@ -6,20 +6,31 @@ micro-agent 是一个用于学习和实验的对话式 agent 骨架。它把一�
 
 ## 快速开始
 
+### 1. 下载并安装依赖
 ```bash
 git clone https://github.com/deepfrish/micro-agent.git
 cd micro-agent
 pip install -r requirements.txt
 ```
 
-项目从根目录 `.env` 读取密钥和服务配置。`.env` 已被 `.gitignore` 忽略，不会上传到 GitHub。
+### 2. 配置环境变量
+项目通过根目录的 `.env` 读取密钥和服务配置。请复制示例文件并填写大模型及相关 API 密钥：
+```bash
+cp .env.example .env
+```
 
-#### MCP 客户端环境初始化（推荐）
-如果你需要在本机的 Cursor 或 Claude Desktop 等客户端中无缝体验完整的 MCP 搜索与文件系统功能，可以运行以下命令：
+### 3. MCP 环境初始化（推荐）
+为了让 Agent 具备本地文件系统读写、Git 仓库操作和 Everything 全局搜索等功能，强烈建议初始化 MCP：
 ```bash
 python scripts/setup_mcp_config.py
 ```
-这将在 `tools/mcp_servers/` 目录下生成一个专属于你本机绝对路径的 `mcp.json`（已被忽略提交），并创建一个安全的沙盒环境 `data/workspace/` 供 MCP 使用。
+这将在 `tools/mcp_servers/` 目录下生成适配你本机路径的 `mcp.json`，并创建安全的沙盒工作区 `data/workspace/` 供 Agent 默认操作。
+
+### 4. 启动交互式 TUI 终端
+执行以下命令启动互动式的 TUI 终端应用，开始与你的 Agent 对话：
+```bash
+python -m src.coder
+```
 
 ## 入口命令
 

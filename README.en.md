@@ -4,20 +4,31 @@ micro-agent is a learning-oriented chat agent skeleton. The goal is to make ever
 
 ## Quick Start
 
+### 1. Clone and Install Dependencies
 ```bash
 git clone https://github.com/deepfrish/micro-agent.git
 cd micro-agent
 pip install -r requirements.txt
 ```
 
-#### MCP Client Environment Initialization (Recommended)
-If you want to seamlessly use the complete MCP search and filesystem functionalities in your local Cursor or Claude Desktop, you can run:
+### 2. Configure Environment Variables
+The application reads secrets from `.env` in the project root. Please duplicate the example file and fill in your API keys:
+```bash
+cp .env.example .env
+```
+
+### 3. MCP Environment Initialization (Recommended)
+To enable robust local filesystem operations, git integrations, and Everything search for your Agent, it is highly recommended to initialize MCP:
 ```bash
 python scripts/setup_mcp_config.py
 ```
 This will automatically generate a localized `mcp.json` (gitignored) in `tools/mcp_servers/` tailored to your absolute paths and create a safe sandbox workspace at `data/workspace/`.
 
-The app reads secrets from `.env` in the project root. `.env` is ignored and will not be pushed.
+### 4. Start the Interactive TUI Terminal
+Run the following command to start the TUI application and begin chatting with the Agent:
+```bash
+python -m src.coder
+```
 
 ## Entry Points
 

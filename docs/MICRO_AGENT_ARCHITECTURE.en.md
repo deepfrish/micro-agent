@@ -94,12 +94,12 @@ The project uses a JSON-line MCP-style protocol to load external tools into the 
 - The client sends `initialize`, `tools/list`, and `tools/call`
 - Each remote tool is wrapped as an `MCPTool`
 - Providers decide which MCP server to start
-- New: Dynamically parses `tools/mcp_servers/mcp.json` to load any standard MCP Servers (e.g. filesystem, everything search, etc.).
+- **Dynamic MCP Provider**: dynamically parses `tools/mcp_servers/mcp.json` to load any standard MCP Server (e.g., `filesystem`, `everything`, `git`, etc.).
 
 Current providers:
 
-- `AmapCapabilityProvider` starts `python -m src.coder mcp-server amap`
-- `FreeWebProvider` starts `tools/mcp_servers/freeweb/dist/index.js` if built, otherwise `npx -y freeweb-mcp@latest`
+- `AmapCapabilityProvider`: launches `python -m src.coder mcp-server amap`
+- `FreeWebProvider`: tries `tools/mcp_servers/freeweb/dist/index.js` first, otherwise falls back to `npx -y freeweb-mcp@latest`
 
 ## One Turn, End to End
 
@@ -264,7 +264,23 @@ Common tools:
 | `screenshot` | Capture a page screenshot |
 | `inspect_llms_txt` | Inspect `llms.txt` guidance |
 
-The conversation layer can bias a turn toward web tools with `/net on` or `/net once`.
+You can use `/net on` or `/net once` to bias the agent toward using web tools.
+
+### Dynamic MCP Tools
+
+Provider: `register_default_mcp_tools()` in `src/core/tools.py`
+
+Execution:
+
+- Automatically launches external processes based on commands configured in `tools/mcp_servers/mcp.json`.
+
+Commonly supported tool categories (specific capabilities depend on your `mcp.json`):
+
+| Category | Server Dependency | Purpose |
+| --- | --- | --- |
+| **Filesystem** | `@modelcontextprotocol/server-filesystem` | Grants the Agent powerful local sandbox filesystem control (e.g., `read_file`, `write_file`, `edit_file`, `create_directory`, `search_files`). |
+| **Everything** | `everything-mcp` | Gives the Agent `everything_search` and `everything_open` tools, providing ultra-fast global file search via Windows Everything. |
+| **Git** | `@modelcontextprotocol/server-git` | Exposes `git_status`, `git_commit`, `git_log`, etc., allowing direct version control management of the current repository. |
 
 ## Module Layout
 
